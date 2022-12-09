@@ -29,19 +29,8 @@ std::shared_ptr<Task> send_msg_task;
 
 SerialTransfer transfer;
 
-int i = 0;
+uint8_t i = 0;
 
-struct __attribute__((packed)) STRUCT{
-  unsigned int sensor_id;
-  unsigned int node_id;
-  float humid;
-  float moisture;
-  float temp;
-  float ozone;
-  float gas;
-} sensData;
-
-/*
 void parseMsg(const String& msg) {
   char* temp = std::strtok((char*)msg.c_str(), "|");
   static String val[4];
@@ -57,13 +46,11 @@ void parseMsg(const String& msg) {
   sensData.temp = val[3].toFloat();
   delete temp;
 }
-*/
 
 void receivedCallback(uint32_t from, const String& msg ) {
   Serial.printf("RECV: %u msg=%s\n", from, msg.c_str());
   if (msg != "S") { // keep parsing when recieving
-    transfer.rxObj(sensData);
-    //parseMsg(msg);
+    parseMsg(msg);
     sensData.node_id = from;
   }
   else mesh.sendSingle(from, "A"); // acknowledge/ACK message
@@ -119,7 +106,6 @@ void setup() {
   if(isinf(calcR0_2)) {Serial.println("Warning: Conection issue on MQ2, R0 is infinite (Open circuit detected) please check your wiring and supply");}
   if(calcR0_2 == 0){Serial.println("Warning: Conection issue found on MQ2, R0 is zero (Analog pin shorts to ground) please check your wiring and supply");}
 
-  //mesh.setDebugMsgTypes( ERROR | MESH_STATUS | CONNECTION | SYNC | COMMUNICATION | GENERAL | MSG_TYPES | REMOTE ); // all types on
   mesh.setDebugMsgTypes( ERROR | STARTUP );  // set before init() so that you can see startup messages
 
   mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP, NODE_NUMBER); // 1 is node ID
