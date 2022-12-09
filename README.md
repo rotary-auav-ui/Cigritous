@@ -1,4 +1,6 @@
 # cigritous
+!['cigritous logo'](https://github.com/rotary-auav-ui/cigritous/blob/main/docs/project_logo.png)  
+
 # ALERT: WIP/Work In Progress!
 ## Branch Information
 #### Ground Branches
@@ -11,6 +13,7 @@ Hardware:
 - DHT22 Humidity and Temperature Sensor
 Software:
 - Arduino IDE 2.x or 1.x
+
 ##### `central-module`
 Repository for central module. Recieves sensor nodes data with mesh and communicates with drone by telemetry
 
