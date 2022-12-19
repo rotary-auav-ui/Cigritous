@@ -4,3 +4,6 @@
 [submodule "libraries/painlessMesh"]
 	path = libraries/painlessMesh
 	url = https://github.com/rotary-auav-ui/painlessMesh
+[submodule "libraries/MQUnifiedsensor"]
+	path = libraries/MQUnifiedsensor
+	url = https://github.com/miguel5612/MQSensorsLib
