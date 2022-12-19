@@ -1,6 +1,5 @@
 #include "painlessMesh.h"
 #include "MQUnifiedsensor.h"
-#include "SerialTransfer.h"
 
 #include <memory>
 #include <cstring>
@@ -26,9 +25,9 @@ painlessMesh mesh;
 
 std::shared_ptr<Task> send_msg_task;
 
-SerialTransfer transfer;
-
 uint8_t i = 0;
+
+
 
 void parseMsg(const String& msg) {
   char* temp = std::strtok((char*)msg.c_str(), "|");
