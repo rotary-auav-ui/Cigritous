@@ -7,7 +7,6 @@
 #include "MQUnifiedsensor.h"
 
 #include <memory>
-#include <cstring>
 
 #define BOARD "ESP32"
 #define V_RES 3.3
@@ -39,19 +38,14 @@ struct {
 } sensData;
 
 void parseMsg(const String& msg) {
-  char* temp = std::strtok((char*)msg.c_str(), "/");
-  static String val[4];
-  i = 0;
-  while (temp) {
-    val[i] = temp;
-    temp = std::strtok(nullptr, "/");  
-    i++;
-  }
-  sensData.sensor_id = val[0].toInt();
-  sensData.humid = val[1].toFloat();
-  sensData.moisture = val[2].toFloat();
-  sensData.temp = val[3].toFloat();
-  delete temp;
+  static size_t pos[3];
+  pos[0] = msg.find("/");
+  sensData.sensor_id = msg.substr(0, pos[0]).toInt();
+  pos[1] = msg.find("/", pos[0]+1);
+  sensData.humid = msg.substr(pos[0]+1, pos[1]-pos[0]-1).toFloat();
+  pos[2] = msg.find("/", pos[1]+1);
+  sensData.moisture = msg.substr(pos[1]+1, pos[2]-pos[1]-1).toFloat();
+  sensData.temp = msg.substr(pos[2]+1, msg.length()).toFloat();
 }
 
 void receivedCallback(uint32_t& from, const String& msg ) {
@@ -123,6 +117,7 @@ void loop() {
 #include "DHTesp.h"
 
 #include <memory>
+#include <vector>
 
 #define uS_TO_S 1E+6
 #define uS_TO_HOURS 3.6E+9
@@ -133,34 +128,14 @@ painlessMesh mesh;
 
 std::shared_ptr<Task> send_msg_task;
 
-// improve later: get sensor count from predefined pin arrays
-int DHT_SENSOR_COUNT = sizeof(DHT_SENSOR_PINS)/sizeof(DHT_SENSOR_PINS[0]);
-int MOIST_SENSOR_COUNT = sizeof(MOIST_SENSOR_PINS)/sizeof(MOIST_SENSOR_PINS[0]);
+std::shared_ptr<DHTesp> dht[SENSOR_COUNT];
+std::shared_ptr<YL3869> yl3869[SENSOR_COUNT];
 
-DHTesp *dht[DHT_SENSOR_COUNT];
-YL3869 *yl3869[MOIST_SENSOR_COUNT];
-
-uint8_t i;
-
-for(i = 0; i < DHT_SENSOR_COUNT; i++) {
-  dht[i] = &DHTesp(DHT_SENSOR_PINS[i], models::DHT22); // add define DHT models later
-}
-
-for(i = 0; i < MOIST_SENSOR_COUNT; i++) {
-  yl3869[i] = &YL3869(MOIST_SENSOR_PINS[i]);
-}
-
-// = { DHTesp(12, models::DHT22), DHTesp(13, models::DHT22)};
-// = { YL3869(32), YL3869(33) };
-
-float humid[DHT_SENSOR_COUNT], temp[DHT_SENSOR_COUNT];
-float moisture[MOIST_SENSOR_COUNT];
-uint8_t SENSOR_COUNT = DHT_SENSOR_COUNT > MOIST_SENSOR_COUNT ? DHT_SENSOR_COUNT : MOIST_SENSOR_COUNT;
+float humid[SENSOR_COUNT], temp[SENSOR_COUNT];
+float moisture[SENSOR_COUNT];
 uint8_t sensor_id[SENSOR_COUNT];
 
-for (i = 1; i <= SENSOR_COUNT; i++) {
-  sensor_id[i] = i;
-}
+uint8_t i;
 
 bool central_status;
 bool queue_status = false;
@@ -172,9 +147,10 @@ String packMsg(uint8_t idx) {
 void readSensorRoutine() {
   for (i = 0; i < SENSOR_COUNT; i++) {
     humid[i] = 83;     //dht[i-1].getHumidity();
-    temp[i] = 20;      //dht[i-1].getTemperature();
+    temp[i] = 20;      //dht[i-1].getTemperature();  
     moisture[i] = 32;  //yl3869[i-1].read();
   }
+
   Serial.println("Sensor data read");
 
   if (mesh.isConnected(1)) Serial.println("Connected to central module. Sending");
@@ -229,12 +205,15 @@ void setup() {
 
   mesh.setDebugMsgTypes(ERROR | STARTUP | CONNECTION);  // set before init() so that you can see startup messages
   
-  /*
-  for (i = 0; i < SENSOR_COUNT; i++) {
-    dht[i].begin();
-    yl3869[i].init();
+  for(i = 0; i < SENSOR_COUNT; i++) {
+    sensor_id[i] = i+1;
+    
+    dht[i] = std::make_shared<DHTesp>(DHT_SENSOR_PINS[i], models::DHT22); // add define DHT models later
+    dht[i]->begin();
+    
+    yl3869[i] = std::make_shared<YL3869>(MOIST_SENSOR_PINS[i]);
+    yl3869[i]->init();
   }
-  */
 
   send_msg_task = std::make_shared<Task>(TASK_MILLISECOND * 1, TASK_ONCE, readSensorRoutine);
   

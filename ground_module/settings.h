@@ -9,6 +9,7 @@
 #if defined(CENTRAL_MODULE)
   #define MQ131_PIN 5
 #else
-  int DHT_SENSOR_PINS[2] = {12, 13};
-  int MOIST_SENSOR_PINS[2] = {22, 23};
+  #define SENSOR_COUNT 2 // Must be in pairs
+  int DHT_SENSOR_PINS[SENSOR_COUNT] = {12, 13};
+  int MOIST_SENSOR_PINS[SENSOR_COUNT] = {22, 23};
 #endif
