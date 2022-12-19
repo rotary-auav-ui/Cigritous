@@ -1,6 +1,6 @@
 [submodule "libraries/TaskScheduler"]
 	path = libraries/TaskScheduler
-	url = https://www.github.com/rotary-auav-ui/TaskScheduler
+	url = https://github.com/rotary-auav-ui/TaskScheduler
 [submodule "libraries/painlessMesh"]
 	path = libraries/painlessMesh
-	url = https://www.github.com/rotary-auav-ui/painlessMesh
+	url = https://github.com/rotary-auav-ui/painlessMesh
