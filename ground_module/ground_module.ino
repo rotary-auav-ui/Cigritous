@@ -79,9 +79,8 @@ void setup() {
 
 
   Serial.print("Calibrating gas sensor, please wait.");
-  float calcR0_131, calcR0_2; // declare in setup because one time only
-  calcR0_131 = 0;
-  calcR0_2 = 0;
+  float calcR0_131 = 0;
+  float calcR0_2 = 0;
   for(i = 1; i<=10; i ++) {
     MQ131.update();
     calcR0_131 += MQ131.calibrate(RAT_MQ131_CA);

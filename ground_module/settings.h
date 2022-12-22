@@ -1,4 +1,8 @@
-#define NODE_MODULE // Option: CENTRAL_MODULE or NODE_MODULE
+/* 
+If you want to flash central module code, use #define with CENTRAL_MODULE 
+If you want to flash node module code, use #define with NODE_MODULE and set the node number
+*/
+#define NODE_MODULE 
 
 #define NODE_NUMBER 5
 
@@ -9,7 +13,7 @@
 #if defined(CENTRAL_MODULE)
   #define MQ131_PIN 5
 #else
-  #define SENSOR_COUNT 2 // Must be in pairs
-  int DHT_SENSOR_PINS[SENSOR_COUNT] = {12, 13};
-  int MOIST_SENSOR_PINS[SENSOR_COUNT] = {22, 23};
+  const int DHT_SENSOR_PINS[2] = {12, 13};
+  const int MOIST_SENSOR_PINS[2] = {22, 23};
+  constexpr int SENSOR_COUNT = ( (sizeof(DHT_SENSOR_PINS)/sizeof(DHT_SENSOR_PINS[0])) + (sizeof(MOIST_SENSOR_PINS)/sizeof(MOIST_SENSOR_PINS[0])) ) / 2;
 #endif
