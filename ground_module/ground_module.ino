@@ -1,7 +1,5 @@
 #include "settings.h"
 
-#include "painlessMesh.h"
-
 #if defined(CENTRAL_MODULE)
 // === CENTRAL MODULE SECTION SOURCE CODE ===
 #include "MQUnifiedsensor.h"
@@ -22,8 +20,6 @@ Scheduler mainscheduler; // task scheduler
 painlessMesh mesh;
 
 std::shared_ptr<Task> send_msg_task;
-
-SerialTransfer transfer;
 
 uint8_t i = 0;
 
@@ -64,13 +60,13 @@ void sendMsgRoutine() {
 
   sensData.ozone = MQ131.readSensorR0Rs();
 
-  // TODO: send to MQTT
+  // TODO: send to back-end
 }
 
 void setup() {
   Serial.begin(115200);
 
-  send_msg_task = std::make_shared<Task>(TASK_SECOND * 5, TASK_FOREVER, sendMsgRoutine);
+  send_msg_task = std::make_shared<Task>(UPDATE_RATE, TASK_FOREVER, sendMsgRoutine);
 
   MQ131.setRegressionMethod(1);
   MQ131.setA(23.943);
@@ -112,6 +108,10 @@ void loop() {
 // === END OF CENTRAL MODULE SOURCE CODE SECTION ===
 #else
 // === NODE MODULE SECTION SOURCE CODE ===
+constexpr uint8_t dht_sensor_count = sizeof(DHT_SENSOR_PINS)/sizeof(DHT_SENSOR_PINS[0]);
+constexpr uint8_t moist_sensor_count = sizeof(MOIST_SENSOR_PINS)/sizeof(MOIST_SENSOR_PINS[0]);
+constexpr uint8_t SENSOR_COUNT = floor( (dht_sensor_count + moist_sensor_count) / 2 );
+
 #include "yl3869.h"
 #include "DHTesp.h"
 
@@ -155,7 +155,7 @@ void readSensorRoutine() {
   if (mesh.isConnected(1)) Serial.println("Connected to central module. Sending");
 
   i = 0;
-  send_msg_task->set(TASK_MILLISECOND * 100, TASK_FOREVER, sendMsgRoutine);
+  send_msg_task->set(TASK_MILLISECOND, TASK_FOREVER, sendMsgRoutine);
 }
 
 void sendMsgRoutine() {
@@ -163,7 +163,7 @@ void sendMsgRoutine() {
   if (i == SENSOR_COUNT) {
     mesh.sendSingle(1, "S");  // confirmation message
     Serial.println("SEND: S");
-    send_msg_task->delay(TASK_SECOND * 8);
+    send_msg_task->delay(REPEAT_SEND_RATE);
     return;
   }
 
@@ -194,7 +194,7 @@ void receivedCallback(uint32_t from, const String& msg) {
   if (msg == "A") {
     Serial.println("Message sent. Change to Deep Sleep Mode");
     mesh.stop();
-    esp_sleep_enable_timer_wakeup(20 * uS_TO_S);
+    esp_sleep_enable_timer_wakeup(UPDATE_RATE);
     esp_deep_sleep_start();
   }
 }
@@ -214,7 +214,7 @@ void setup() {
     yl3869[i]->init();
   }
 
-  send_msg_task = std::make_shared<Task>(TASK_MILLISECOND * 1, TASK_ONCE, readSensorRoutine);
+  send_msg_task = std::make_shared<Task>(TASK_MILLISECOND, TASK_ONCE, readSensorRoutine);
   
   mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP_STA, NODE_NUMBER);  // node number can be changed from settings.h
   mesh.onReceive(receivedCallback);
