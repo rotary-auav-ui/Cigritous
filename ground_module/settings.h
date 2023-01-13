@@ -3,12 +3,12 @@
 If you want to flash central module code, use #define with CENTRAL_MODULE 
 If you want to flash node module code, use #define with NODE_MODULE and set the node number
 */
-#define NODE_MODULE 
+#define CENTRAL_MODULE 
 
 #define NODE_NUMBER 5
 
-#define MESH_PREFIX     "meshSSID"
-#define MESH_PASSWORD   "meshPassword"
+#define MESH_PREFIX     "JuanJonathan"
+#define MESH_PASSWORD   "123juan123;'"
 #define MESH_PORT       5555
 
 #if defined(CENTRAL_MODULE)

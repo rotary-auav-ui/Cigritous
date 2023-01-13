@@ -4,6 +4,7 @@
 // === CENTRAL MODULE SECTION SOURCE CODE ===
 #include "MQUnifiedsensor.h"
 
+#include <mavlink.h>
 #include <memory>
 
 #define BOARD "ESP32"
@@ -33,18 +34,117 @@ struct {
   float gas;
 } sensData;
 
-void parseMsg(const String& msg) {
-  static size_t pos[3];
-  pos[0] = msg.find("/");
-  sensData.sensor_id = msg.substr(0, pos[0]).toInt();
-  pos[1] = msg.find("/", pos[0]+1);
-  sensData.humid = msg.substr(pos[0]+1, pos[1]-pos[0]-1).toFloat();
-  pos[2] = msg.find("/", pos[1]+1);
-  sensData.moisture = msg.substr(pos[1]+1, pos[2]-pos[1]-1).toFloat();
-  sensData.temp = msg.substr(pos[2]+1, msg.length()).toFloat();
+struct Odom{
+  float x;
+  float y;
+  float z;
+  float vx;
+  float vy;
+  float vz;
+}odom;
+
+void req_data(){
+  uint8_t sys_id = 255; // qgc id
+  uint8_t comp_id = 2; // any?
+  uint8_t tgt_sys = 1; // id of pxhawk = 1
+  uint8_t tgt_comp = 1; // 0 broadcast, 1 work juga
+  uint8_t req_stream_id = MAV_DATA_STREAM_ALL;
+  uint16_t req_msg_rate = 0x01; // 1 times per second
+  uint8_t start_stop = 1; // 1 start, 0 = stop
+
+  mavlink_message_t msg;
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+
+  mavlink_msg_request_data_stream_pack(sys_id, comp_id, &msg, tgt_sys, tgt_comp, req_stream_id, req_msg_rate, start_stop);
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);  // Send the message (.write sends as bytes)
+ 
+  Serial1.write(buf, len); 
 }
 
-void receivedCallback(uint32_t& from, const String& msg ) {
+void read_data(){
+  mavlink_message_t msg;
+  mavlink_status_t status;
+ 
+  while(Serial1.available())
+  {
+    uint8_t c = Serial1.read();
+ 
+    //Get new message
+    if(mavlink_parse_char(MAVLINK_COMM_0, c, &msg, &status))
+    {
+ 
+    //Handle new message from autopilot
+      switch(msg.msgid)
+      {
+        case MAVLINK_MSG_ID_GPS_RAW_INT:
+          mavlink_gps_raw_int_t packet;
+          mavlink_msg_gps_raw_int_decode(&msg, &packet);
+          
+          Serial.print("\nGPS Fix: ");Serial.println(packet.fix_type);
+          Serial.print("GPS Latitude: ");Serial.println(packet.lat);
+          Serial.print("GPS Longitude: ");Serial.println(packet.lon);
+          Serial.print("GPS Speed: ");Serial.println(packet.vel);
+          Serial.print("Sats Visible: ");Serial.println(packet.satellites_visible);
+          break;
+        case MAVLINK_MSG_ID_ODOMETRY:
+          
+          break;
+        
+      }
+    }
+  }
+}
+
+void read_data_odom(mavlink_message_t& msg){
+  mavlink_odometry_t odom_in;
+  mavlink_msg_odometry_decode(&msg, &odom_in);
+
+  odom.x = odom_in.x;
+  odom.y = odom_in.y;
+  odom.z = odom_in.z;
+  odom.vx = odom_in.vx;
+  odom.vy = odom_in.vy;
+  odom.vz = odom_in.vz;
+
+  Serial.print("\nX : ");Serial.println(odom.x);
+  Serial.print("Y : ");Serial.println(odom.y);
+  Serial.print("Z : ");Serial.println(odom.z);
+  Serial.print("vX : ");Serial.println(odom.vx);
+  Serial.print("vY : ");Serial.println(odom.vy);
+  Serial.print("vZ : ");Serial.println(odom.vz);
+}
+
+void parseMsg(const String& msg) {
+  static size_t pos[3];
+  int l = msg.length();
+  for(int i = 0; i < l; i++){
+    if(msg[i] == '/'){
+      pos[0] = i;
+      break;
+    }
+  }
+  // pos[0] = msg.find("/");
+  sensData.sensor_id = msg.substring(0, pos[0]).toInt();
+  for(int i = pos[0] + 1; i < l; i++){
+    if(msg[i] == '/'){
+      pos[1] = i;
+      break;
+    }
+  }
+  // pos[1] = msg.find("/", pos[0]+1);
+  sensData.humid = msg.substring(pos[0]+1, pos[1]-pos[0]-1).toFloat();
+  for(int i = pos[1] + 1; i < l; i++){
+    if(msg[i] == '/'){
+      pos[1] = i;
+      break;
+    }
+  }
+  // pos[2] = msg.find("/", pos[1]+1);
+  sensData.moisture = msg.substring(pos[1]+1, pos[2]-pos[1]-1).toFloat();
+  sensData.temp = msg.substring(pos[2]+1, l).toFloat();
+}
+
+void receivedCallback(uint32_t from, const String& msg ) {
   Serial.printf("RECV: %u msg=%s\n", from, msg.c_str());
   if (msg != "S") { // keep parsing when recieving
     parseMsg(msg);
@@ -94,7 +194,7 @@ void setup() {
   mesh.setDebugMsgTypes( ERROR | STARTUP );  // set before init() so that you can see startup messages
 
   mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP, 1); // Central node number will always be 1
-  mesh.onReceive(receivedCallback);
+  mesh.onReceive(&receivedCallback);
 
   mainscheduler.addTask(ConvTask::getFromShared(send_msg_task));
   send_msg_task->enable();
@@ -112,7 +212,7 @@ constexpr uint8_t dht_sensor_count = sizeof(DHT_SENSOR_PINS)/sizeof(DHT_SENSOR_P
 constexpr uint8_t moist_sensor_count = sizeof(MOIST_SENSOR_PINS)/sizeof(MOIST_SENSOR_PINS[0]);
 constexpr uint8_t SENSOR_COUNT = floor( (dht_sensor_count + moist_sensor_count) / 2 );
 
-#include "yl3869.h"
+#include <yl3869.h>
 #include "DHTesp.h"
 
 #include <memory>
@@ -217,7 +317,7 @@ void setup() {
   send_msg_task = std::make_shared<Task>(TASK_MILLISECOND, TASK_ONCE, readSensorRoutine);
   
   mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP_STA, NODE_NUMBER);  // node number can be changed from settings.h
-  mesh.onReceive(receivedCallback);
+  mesh.onReceive(&receivedCallback);
   mesh.onNewConnection(newConnectionCallback);
 
   mainscheduler.addTask(ConvTask::getFromShared(send_msg_task));
