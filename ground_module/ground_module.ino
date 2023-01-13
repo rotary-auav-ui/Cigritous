@@ -23,6 +23,8 @@ painlessMesh mesh;
 std::shared_ptr<Task> send_msg_task;
 
 uint8_t i = 0;
+uint8_t px_mode;
+uint8_t px_status;
 
 struct {
   uint8_t sensor_id;
@@ -34,31 +36,84 @@ struct {
   float gas;
 } sensData;
 
-struct Odom{
-  float x;
-  float y;
-  float z;
-  float vx;
-  float vy;
-  float vz;
-}odom;
-
-void req_data(){
+struct{
   uint8_t sys_id = 255; // qgc id
   uint8_t comp_id = 2; // any?
   uint8_t tgt_sys = 1; // id of pxhawk = 1
   uint8_t tgt_comp = 1; // 0 broadcast, 1 work juga
-  uint8_t req_stream_id = MAV_DATA_STREAM_ALL;
+}sys;
+
+void req_status(){
+  sys.sys_id = 255;
+  sys.comp_id = 2;
+  sys.tgt_sys = 1;
+  sys.tgt_comp = 1;
+  uint8_t req_stream_id = MAV_DATA_STREAM_EXTENDED_STATUS;
   uint16_t req_msg_rate = 0x01; // 1 times per second
   uint8_t start_stop = 1; // 1 start, 0 = stop
 
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
-  mavlink_msg_request_data_stream_pack(sys_id, comp_id, &msg, tgt_sys, tgt_comp, req_stream_id, req_msg_rate, start_stop);
+  mavlink_msg_request_data_stream_pack(sys.sys_id, sys.comp_id, &msg, sys.tgt_sys, sys.tgt_comp, req_stream_id, req_msg_rate, start_stop);
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);  // Send the message (.write sends as bytes)
  
-  Serial1.write(buf, len); 
+  Serial1.write(buf, len);
+}
+
+void set_waypoint(const float& x, const float& y, const float& z){
+  Serial.printf("Setting waypoint lat : %f, lng : %f, height : %f", x, y, z);
+  mavlink_message_t msg;
+  uint8_t buf[MAVLINK_MSG_ID_MISSION_ITEM_LEN];
+
+  static int seq = 0;
+  uint8_t frame = MAV_FRAME_GLOBAL;
+  uint8_t command = 16; //waypoint
+  uint8_t current = 0;
+  uint8_t cont = 1;
+  float param1 = 1;
+  float param2 = 1;
+  float param3 = 0;
+  float param4 = NAN;
+  int32_t lat = x * 1e7;
+  int32_t lng = y * 1e7;
+  float height = z;
+  uint8_t mission_type = MAV_MISSION_TYPE_MISSION;
+
+  mavlink_msg_mission_item_int_pack(sys.sys_id, sys.comp_id, &msg, sys.tgt_sys, sys.tgt_comp, seq, frame, command, current, cont, param1, param2, param3, param4, x, y, z, mission_type);
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+
+  Serial1.write(buf, len);
+}
+
+void arm(){
+  Serial.println("Arming");
+  mavlink_message_t msg;
+  uint8_t buf[MAVLINK_MSG_ID_COMMAND_LONG_LEN];
+
+  uint16_t command = 400; //arm disarm
+  uint8_t conf = 0;
+  float param1 = 1; //arm = 1
+
+  mavlink_msg_command_long_pack(sys.sys_id, sys.comp_id, &msg, sys.tgt_sys, sys.tgt_comp, command, conf, param1, 0, 0, 0, 0, 0, 0);
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+
+  Serial1.write(buf, len);
+}
+
+void return_to_launch(){
+  Serial.println("Returning to launch");
+
+  mavlink_message_t msg;
+  uint8_t buf[MAVLINK_MSG_ID_COMMAND_LONG_LEN];
+
+  uint16_t command = 20; //arm disarm
+  uint8_t conf = 0;
+
+  mavlink_msg_command_long_pack(sys.sys_id, sys.comp_id, &msg, sys.tgt_sys, sys.tgt_comp, command, conf, 0, 0, 0, 0, 0, 0, 0);
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+
+  Serial1.write(buf, len);
 }
 
 void read_data(){
@@ -76,72 +131,33 @@ void read_data(){
     //Handle new message from autopilot
       switch(msg.msgid)
       {
-        case MAVLINK_MSG_ID_GPS_RAW_INT:
-          mavlink_gps_raw_int_t packet;
-          mavlink_msg_gps_raw_int_decode(&msg, &packet);
-          
-          Serial.print("\nGPS Fix: ");Serial.println(packet.fix_type);
-          Serial.print("GPS Latitude: ");Serial.println(packet.lat);
-          Serial.print("GPS Longitude: ");Serial.println(packet.lon);
-          Serial.print("GPS Speed: ");Serial.println(packet.vel);
-          Serial.print("Sats Visible: ");Serial.println(packet.satellites_visible);
+        case MAVLINK_MSG_ID_HEARTBEAT:
+          check_mode(&msg);
           break;
         case MAVLINK_MSG_ID_ODOMETRY:
           
           break;
-        
       }
     }
   }
 }
 
-void read_data_odom(mavlink_message_t& msg){
-  mavlink_odometry_t odom_in;
-  mavlink_msg_odometry_decode(&msg, &odom_in);
-
-  odom.x = odom_in.x;
-  odom.y = odom_in.y;
-  odom.z = odom_in.z;
-  odom.vx = odom_in.vx;
-  odom.vy = odom_in.vy;
-  odom.vz = odom_in.vz;
-
-  Serial.print("\nX : ");Serial.println(odom.x);
-  Serial.print("Y : ");Serial.println(odom.y);
-  Serial.print("Z : ");Serial.println(odom.z);
-  Serial.print("vX : ");Serial.println(odom.vx);
-  Serial.print("vY : ");Serial.println(odom.vy);
-  Serial.print("vZ : ");Serial.println(odom.vz);
+void check_mode(mavlink_message_t* msg){
+  mavlink_heartbeat_t hb;
+  mavlink_msg_heartbeat_decode(msg, &hb);
+  px_mode = hb.base_mode;
+  px_status = hb.system_status;
 }
 
 void parseMsg(const String& msg) {
   static size_t pos[3];
-  int l = msg.length();
-  for(int i = 0; i < l; i++){
-    if(msg[i] == '/'){
-      pos[0] = i;
-      break;
-    }
-  }
-  // pos[0] = msg.find("/");
+  pos[0] = msg.indexOf('/');
   sensData.sensor_id = msg.substring(0, pos[0]).toInt();
-  for(int i = pos[0] + 1; i < l; i++){
-    if(msg[i] == '/'){
-      pos[1] = i;
-      break;
-    }
-  }
-  // pos[1] = msg.find("/", pos[0]+1);
+  pos[1] = msg.indexOf("/", pos[0]+1);
   sensData.humid = msg.substring(pos[0]+1, pos[1]-pos[0]-1).toFloat();
-  for(int i = pos[1] + 1; i < l; i++){
-    if(msg[i] == '/'){
-      pos[1] = i;
-      break;
-    }
-  }
-  // pos[2] = msg.find("/", pos[1]+1);
+  pos[2] = msg.indexOf("/", pos[1]+1);
   sensData.moisture = msg.substring(pos[1]+1, pos[2]-pos[1]-1).toFloat();
-  sensData.temp = msg.substring(pos[2]+1, l).toFloat();
+  sensData.temp = msg.substring(pos[2]+1, msg.length()).toFloat();
 }
 
 void receivedCallback(uint32_t from, const String& msg ) {
@@ -165,6 +181,12 @@ void sendMsgRoutine() {
 
 void setup() {
   Serial.begin(115200);
+
+  read_data();
+  while(px_status != MAV_STATE_STANDBY){
+    Serial.println("Pixhawk not on standby!");
+    delay(2000);
+  }
 
   send_msg_task = std::make_shared<Task>(UPDATE_RATE, TASK_FOREVER, sendMsgRoutine);
 

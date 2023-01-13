@@ -3,7 +3,7 @@
 If you want to flash central module code, use #define with CENTRAL_MODULE 
 If you want to flash node module code, use #define with NODE_MODULE and set the node number
 */
-#define CENTRAL_MODULE 
+#define NODE_MODULE 
 
 #define NODE_NUMBER 5
 
