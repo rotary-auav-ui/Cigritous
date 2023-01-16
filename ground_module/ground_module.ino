@@ -12,6 +12,10 @@ constexpr float SENSOR_LOC[SENSOR_COUNT][2] = {{6.1523124, -6.412512}, {6.165124
 constexpr float fly_altitude = 2; //relative to home
 
 #include "MQUnifiedsensor.h"
+#include <Wire.h>
+#include <SPI.h>
+#include <Adafruit_Sensor.h>
+#include "Adafruit_BME680.h"
 
 #include <mavlink.h>
 #include <memory>
@@ -22,7 +26,10 @@ constexpr float fly_altitude = 2; //relative to home
 
 #define RAT_MQ131_CA 15
 
+#define NUM_OF_MISSION 3
+
 //TODO: Add BME688
+Adafruit_BME680 bme(BME_CS, BME_MOSI, BME_MISO, BME_SCK);
 MQUnifiedsensor MQ131(BOARD, V_RES, ADC_BIT, MQ131_PIN, "MQ-131");
 
 Scheduler mainscheduler; // task scheduler
@@ -60,7 +67,7 @@ void init_sensor_locations(){
   //read from backend, for now keep static
 }
 
-void req_status(){ //DEPRECATED SINCE 2015, BUT STILL RECOMMENDED TO USE BY PX4/Ardupilot, SUPPOSEDLY REPLACED BY MAV_CMD_SET_MESSAGE_INTERVAL.
+void req_data_stream(){ //DEPRECATED SINCE 2015, BUT STILL RECOMMENDED TO USE BY PX4/Ardupilot, SUPPOSEDLY REPLACED BY MAV_CMD_SET_MESSAGE_INTERVAL.
   sys.sys_id = 255;
   sys.comp_id = 2;
   sys.tgt_sys = 1;
@@ -79,10 +86,10 @@ void req_status(){ //DEPRECATED SINCE 2015, BUT STILL RECOMMENDED TO USE BY PX4/
 }
 
 void send_mission_count(const int& num_of_mission){
-  Serial.printf("Sending mission count: %d\n", (num_of_mission + 3));
+  Serial.printf("Sending mission count: %d\n", (num_of_mission));
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MSG_ID_MISSION_COUNT_LEN];
-  uint16_t count = num_of_mission + 3; 
+  uint16_t count = num_of_mission; 
   uint8_t mission_type = MAV_MISSION_TYPE_MISSION;
 
   mavlink_msg_mission_count_pack(sys.sys_id, sys.comp_id, &msg, sys.tgt_sys, sys.tgt_comp, count, mission_type);
@@ -91,8 +98,8 @@ void send_mission_count(const int& num_of_mission){
   Serial1.write(buf, len);  
 }
 
-void send_mission_items(const int& num_of_mission, const int id[num_of_mission]){
-  send_mission_count(num_of_mission);
+void send_mission_items(int id[NUM_OF_MISSION]){
+  send_mission_count(NUM_OF_MISSION);
 
   for(int i = 0; i < SENSOR_COUNT; i++){
     seq_prev = seq;
@@ -113,11 +120,11 @@ void send_mission_items(const int& num_of_mission, const int id[num_of_mission])
     float param3 = 0;
     float param4 = NAN;
     int32_t lat = SENSOR_LOC[id[i]][0] * 1e7;
-    int32_t lng = SENSOR_LOC[id[i]] * 1e7;
+    int32_t lng = SENSOR_LOC[id[i]][1] * 1e7;
     float height = fly_altitude;
     uint8_t mission_type = MAV_MISSION_TYPE_MISSION;
 
-    mavlink_msg_mission_item_int_pack(sys.sys_id, sys.comp_id, &msg, sys.tgt_sys, sys.tgt_comp, seq, frame, command, current, cont, param1, param2, param3, param4, x, y, z, mission_type);
+    mavlink_msg_mission_item_int_pack(sys.sys_id, sys.comp_id, &msg, sys.tgt_sys, sys.tgt_comp, seq, frame, command, current, cont, param1, param2, param3, param4, lat, lng, height, mission_type);
     uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
 
     Serial1.write(buf, len);
@@ -275,31 +282,31 @@ void read_data(){
       switch(msg.msgid)
       {
         case MAVLINK_MSG_ID_HEARTBEAT:
-          check_mode(&msg);
+          check_mode(msg);
           break;
         case MAVLINK_MSG_ID_MISSION_REQUEST_INT:
-          mission_request(&msg);
+          mission_request(msg);
           break;
         case MAVLINK_MSG_ID_MISSION_ACK:
-          uploaded_mission_status(&msg);
+          uploaded_mission_status(msg);
         case MAVLINK_MSG_ID_MISSION_ITEM_REACHED:
-          check_mission_progress(&msg);
+          check_mission_progress(msg);
           break;
       }
     }
   }
 }
 
-void check_mode(mavlink_message_t& msg){
+void check_mode(mavlink_message_t msg){
   mavlink_heartbeat_t hb;
-  mavlink_msg_heartbeat_decode(msg, &hb);
+  mavlink_msg_heartbeat_decode(&msg, &hb);
   px_mode = hb.base_mode;
   px_status = hb.system_status;
 }
 
-void mission_request(mavlink_message_t& msg){
+void mission_request(mavlink_message_t msg){
   mavlink_mission_request_int_t mis_req;
-  mavlink_msg_mission_request_int_decode(msg, &mis_req);
+  mavlink_msg_mission_request_int_decode(&msg, &mis_req);
   seq_prev = seq; //retain previous sequence number
   seq = mis_req.seq;
   sys.tgt_sys = mis_req.target_system;
@@ -307,16 +314,16 @@ void mission_request(mavlink_message_t& msg){
   Serial.printf("Requesting for mission type %u sequence %u\n", mis_req.mission_type, seq);
 }
 
-void check_mission_progress(mavlink_message_t& msg){
+void check_mission_progress(mavlink_message_t msg){
   mavlink_mission_item_reached_t it;
-  mavlink_msg_mission_item_reached_decode(msg, &it);
+  mavlink_msg_mission_item_reached_decode(&msg, &it);
   seq_prev = it.seq; //using same variable to save memory
   Serial.printf("Mission sequence %u reached\n", seq_prev);
 }
 
-void uploaded_mission_status(mavlink_message_t& msg){
+void uploaded_mission_status(mavlink_message_t msg){
   mavlink_mission_ack_t mis_ack;
-  mavlink_msg_mission_ack_decode(msg, mis_ack);
+  mavlink_msg_mission_ack_decode(&msg, &mis_ack);
   mis_up_status = mis_ack.type;
   if(mis_up_status == MAV_MISSION_ACCEPTED){
     Serial.println("Mission accepted");
@@ -348,6 +355,27 @@ void receivedCallback(uint32_t from, const String& msg ) {
 void sendMsgRoutine() {
 
   // TODO: add BME688 readings
+  bme.performReading();
+  Serial.print("Temperature = ");
+  Serial.print(bme.temperature);
+  Serial.println(" *C");
+
+  Serial.print("Pressure = ");
+  Serial.print(bme.pressure / 100.0);
+  Serial.println(" hPa");
+
+  Serial.print("Humidity = ");
+  Serial.print(bme.humidity);
+  Serial.println(" %");
+
+  Serial.print("Gas = ");
+  Serial.print(bme.gas_resistance / 1000.0);
+  Serial.println(" KOhms");
+
+  Serial.print("Approx. Altitude = ");
+  Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA));
+  Serial.println(" m");
+
   MQ131.update();
 
   sensData.ozone = MQ131.readSensorR0Rs();
@@ -358,7 +386,7 @@ void sendMsgRoutine() {
 void setup() {
   Serial.begin(115200);
 
-  read_data_stream(); //request data from pixhawk (heartbeat, response, vehicle status, etc)
+  req_data_stream(); //request data from pixhawk (heartbeat, response, vehicle status, etc)
 
   while(px_status != MAV_STATE_STANDBY){
     Serial.println("Pixhawk not on standby!");
@@ -367,6 +395,14 @@ void setup() {
   }
 
   send_msg_task = std::make_shared<Task>(UPDATE_RATE, TASK_FOREVER, sendMsgRoutine);
+
+  bme.begin();
+  // Set up oversampling and filter initialization
+  bme.setTemperatureOversampling(BME680_OS_8X);
+  bme.setHumidityOversampling(BME680_OS_2X);
+  bme.setPressureOversampling(BME680_OS_4X);
+  bme.setIIRFilterSize(BME680_FILTER_SIZE_3);
+  bme.setGasHeater(320, 150); // 320*C for 150 ms
 
   MQ131.setRegressionMethod(1);
   MQ131.setA(23.943);
