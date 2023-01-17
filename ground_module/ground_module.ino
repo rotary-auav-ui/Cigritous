@@ -2,23 +2,29 @@
 
 #if defined(CENTRAL_MODULE)
 // === CENTRAL MODULE SECTION SOURCE CODE ===
-constexpr uint8_t dht_sensor_count = sizeof(DHT_SENSOR_PINS)/sizeof(DHT_SENSOR_PINS[0]);
-constexpr uint8_t moist_sensor_count = sizeof(MOIST_SENSOR_PINS)/sizeof(MOIST_SENSOR_PINS[0]);
-constexpr uint8_t SENSOR_COUNT = floor( (dht_sensor_count + moist_sensor_count) / 2 );
 
 //latitude and longitude of home and sensor. Change to static float when able to read from backend
 constexpr float HOME_LOC[2] = {6.124125, -6.12412512};
-constexpr float SENSOR_LOC[SENSOR_COUNT][2] = {{6.1523124, -6.412512}, {6.165124, -6.2512412}}; 
+constexpr float SENSOR_LOC[TOTAL_NODE * SENSOR_COUNT][2] = {{6.1523124, -6.412512}}; 
 constexpr float fly_altitude = 2; //relative to home
 
+//sensors
 #include "MQUnifiedsensor.h"
 #include <Wire.h>
 #include <SPI.h>
 #include <Adafruit_Sensor.h>
 #include "Adafruit_BME680.h"
 
+//sending to backend
+#include "time.h"
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+
+//mavlink
 #include <mavlink.h>
 #include <memory>
+
 
 #define BOARD "ESP32"
 #define V_RES 3.3
@@ -45,6 +51,16 @@ uint16_t seq_prev = 1000, seq = 1000; // might not be needed for mission_item_re
 uint8_t mis_up_status;
 // static float home_location[2], sensor_loc[SENSOR_COUNT][2]; //read from backend in init_sensor_location
 
+//backend informations 
+unsigned long epochTime; 
+unsigned long dataMillis = 0;
+
+const char* ntpServer = "id.pool.ntp.org";
+const char* serverName = "https://data.mongodb-api.com/app/data-kmljr/endpoint/ESP32";
+
+// StaticJsonDocument<JSON_OBJECT_SIZE(5)> central;
+StaticJsonDocument<JSON_OBJECT_SIZE(5) + JSON_ARRAY_SIZE(TOTAL_NODE * SENSOR_COUNT) + (TOTAL_NODE * SENSOR_COUNT) * JSON_OBJECT_SIZE(4)> sensors;
+ 
 
 struct {
   uint8_t sensor_id;
@@ -67,6 +83,8 @@ void init_sensor_locations(){
   //read from backend, for now keep static
 }
 
+// REQUEST AND PARSE INCOMING DATA
+
 void req_data_stream(){ //DEPRECATED SINCE 2015, BUT STILL RECOMMENDED TO USE BY PX4/Ardupilot, SUPPOSEDLY REPLACED BY MAV_CMD_SET_MESSAGE_INTERVAL.
   sys.sys_id = 255;
   sys.comp_id = 2;
@@ -79,11 +97,250 @@ void req_data_stream(){ //DEPRECATED SINCE 2015, BUT STILL RECOMMENDED TO USE BY
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
-  mavlink_msg_request_data_stream_pack(sys.sys_id, sys.comp_id, &msg, sys.tgt_sys, sys.tgt_comp, req_stream_id, req_msg_rate, start_stop);
+  mavlink_msg_request_data_stream_pack(
+    sys.sys_id, 
+    sys.comp_id, 
+    &msg, 
+    sys.tgt_sys, 
+    sys.tgt_comp, 
+    req_stream_id, 
+    req_msg_rate, 
+    start_stop
+  );
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);  // Send the message (.write sends as bytes)
  
   Serial1.write(buf, len);
 }
+
+void read_data(){
+  mavlink_message_t msg;
+  mavlink_status_t status;
+ 
+  while(Serial1.available())
+  {
+    uint8_t c = Serial1.read();
+ 
+    //Get new message
+    if(mavlink_parse_char(MAVLINK_COMM_0, c, &msg, &status))
+    {
+ 
+    //Handle new message from autopilot
+      switch(msg.msgid)
+      {
+        case MAVLINK_MSG_ID_HEARTBEAT:
+          check_mode(msg);
+          break;
+        case MAVLINK_MSG_ID_MISSION_REQUEST_INT:
+          mission_request(msg);
+          break;
+        case MAVLINK_MSG_ID_MISSION_ACK:
+          uploaded_mission_status(msg);
+          break;
+        case MAVLINK_MSG_ID_MISSION_ITEM_REACHED:
+          check_mission_progress(msg);
+          break;
+      }
+    }
+  }
+}
+
+void check_mode(mavlink_message_t msg){
+  mavlink_heartbeat_t hb;
+  mavlink_msg_heartbeat_decode(&msg, &hb);
+  px_mode = hb.base_mode;
+  px_status = hb.system_status;
+}
+
+void mission_request(mavlink_message_t msg){
+  mavlink_mission_request_int_t mis_req;
+  mavlink_msg_mission_request_int_decode(&msg, &mis_req);
+  seq_prev = seq; //retain previous sequence number
+  seq = mis_req.seq;
+  sys.tgt_sys = mis_req.target_system;
+  sys.tgt_comp = mis_req.target_component;
+  Serial.printf("Requesting for mission type %u sequence %u\n", mis_req.mission_type, seq);
+  
+  // send_mission_item(sensor_id);
+}
+
+void check_mission_progress(mavlink_message_t msg){
+  mavlink_mission_item_reached_t it;
+  mavlink_msg_mission_item_reached_decode(&msg, &it);
+  seq_prev = it.seq; //using same variable to save memory
+  Serial.printf("Mission sequence %u reached\n", seq_prev);
+}
+
+void uploaded_mission_status(mavlink_message_t msg){
+  mavlink_mission_ack_t mis_ack;
+  mavlink_msg_mission_ack_decode(&msg, &mis_ack);
+  mis_up_status = mis_ack.type;
+  if(mis_up_status == MAV_MISSION_ACCEPTED){
+    Serial.println("Mission accepted");
+  }else{
+    Serial.printf("Mission unaccepted with enum %u\n", mis_up_status);
+  }
+}
+
+// VEHICLE COMMANDS
+
+void arm(){
+  Serial.println("Arming");
+  mavlink_message_t msg;
+  uint8_t buf[MAVLINK_MSG_ID_COMMAND_LONG_LEN];
+
+  uint16_t command = 400; //arm disarm
+  uint8_t conf = 0;
+  float param1 = 1; //arm = 1
+
+  mavlink_msg_command_long_pack(
+    sys.sys_id, 
+    sys.comp_id, 
+    &msg, 
+    sys.tgt_sys, 
+    sys.tgt_comp, 
+    command, 
+    conf, 
+    param1, 
+    0, 0, 0, 0, 0, 0);
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+
+  Serial1.write(buf, len);
+}
+
+void disarm(){
+  Serial.println("Disarming");
+  mavlink_message_t msg;
+  uint8_t buf[MAVLINK_MSG_ID_COMMAND_LONG_LEN];
+
+  uint16_t command = 400; //arm disarm
+  uint8_t conf = 0;
+  float param1 = 0; //disarm = 0
+
+  mavlink_msg_command_long_pack(
+    sys.sys_id, 
+    sys.comp_id, 
+    &msg, 
+    sys.tgt_sys, 
+    sys.tgt_comp, 
+    command, 
+    conf, 
+    param1, 
+    0, 0, 0, 0, 0, 0
+  );
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+
+  Serial1.write(buf, len);
+}
+
+void takeoff(){
+  while(px_mode != MAV_MODE_FLAG_SAFETY_ARMED){
+    arm();
+  }
+
+  while(px_mode != MAV_MODE_FLAG_AUTO_ENABLED){
+    set_mode(MAV_MODE_AUTO_ARMED);
+  }
+
+  Serial.println("Taking off");
+  mavlink_message_t msg;
+  uint8_t buf[MAVLINK_MSG_ID_COMMAND_LONG_LEN];
+
+  uint16_t command = 22; //takeoff
+  uint8_t conf = 0;
+  float param7 = fly_altitude;
+
+  mavlink_msg_command_long_pack(
+    sys.sys_id, 
+    sys.comp_id, 
+    &msg, 
+    sys.tgt_sys, 
+    sys.tgt_comp, 
+    command, 
+    conf, 
+    0, 0, 0, 0, 0, 0, 
+    param7
+  );
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+
+  Serial.write(buf, len);
+}
+
+void land(){
+  Serial.println("Taking off");
+  mavlink_message_t msg;
+  uint8_t buf[MAVLINK_MSG_ID_COMMAND_LONG_LEN];
+
+  uint16_t command = 21; //land
+  uint8_t conf = 0;
+
+  //altitude determined by param7, here it is 0 relative to frame.
+  mavlink_msg_command_long_pack(
+    sys.sys_id, 
+    sys.comp_id, 
+    &msg, 
+    sys.tgt_sys, 
+    sys.tgt_comp, 
+    command, 
+    conf, 
+    0, 0, 0, 0, 0, 0, 0
+  );
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+
+  Serial.write(buf, len);
+
+  disarm();
+}
+
+void set_mode(const uint16_t& mode){
+  Serial.println("Setting mode to auto");
+  mavlink_message_t msg;
+  uint8_t buf[MAVLINK_MSG_ID_COMMAND_LONG_LEN];
+
+  uint16_t command = 176; //do set mode
+  uint8_t conf = 0;
+  float param1 = mode; //auto disarmed
+
+  mavlink_msg_command_long_pack(
+    sys.sys_id, 
+    sys.comp_id, 
+    &msg, 
+    sys.tgt_sys, 
+    sys.tgt_comp, 
+    command, 
+    conf, 
+    param1, 
+    0, 0, 0, 0, 0, 0
+  );
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+  
+  Serial1.write(buf, len);
+}
+
+void return_to_launch(){
+  Serial.println("Returning to launch");
+
+  mavlink_message_t msg;
+  uint8_t buf[MAVLINK_MSG_ID_COMMAND_LONG_LEN];
+
+  uint16_t command = 20; //return to launch
+  uint8_t conf = 0;
+
+  mavlink_msg_command_long_pack(
+    sys.sys_id, 
+    sys.comp_id, 
+    &msg, 
+    sys.tgt_sys, 
+    sys.tgt_comp, 
+    command, 
+    conf, 
+    0, 0, 0, 0, 0, 0, 0
+  );
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+
+  Serial1.write(buf, len);
+}
+
+// MISSION ITEMS
 
 void send_mission_count(const int& num_of_mission){
   Serial.printf("Sending mission count: %d\n", (num_of_mission));
@@ -92,51 +349,63 @@ void send_mission_count(const int& num_of_mission){
   uint16_t count = num_of_mission; 
   uint8_t mission_type = MAV_MISSION_TYPE_MISSION;
 
-  mavlink_msg_mission_count_pack(sys.sys_id, sys.comp_id, &msg, sys.tgt_sys, sys.tgt_comp, count, mission_type);
+  mavlink_msg_mission_count_pack(
+    sys.sys_id, 
+    sys.comp_id, 
+    &msg, 
+    sys.tgt_sys, 
+    sys.tgt_comp, 
+    count, 
+    mission_type
+  );
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
 
   Serial1.write(buf, len);  
 }
 
-void send_mission_items(int id[NUM_OF_MISSION]){
-  send_mission_count(NUM_OF_MISSION);
+void send_mission_item(const int& sensor_id){
+  Serial.printf("Setting waypoint lat : %f, lng : %f, height : %f\n", SENSOR_LOC[sensor_id - 1][0], SENSOR_LOC[sensor_id - 1][1], fly_altitude);
+  mavlink_message_t msg;
+  uint8_t buf[MAVLINK_MSG_ID_MISSION_ITEM_LEN];
 
-  for(int i = 0; i < SENSOR_COUNT; i++){
-    seq_prev = seq;
-    while(seq == seq_prev){
-      Serial.printf("Waiting for mission sequence %u request sent by px\n", seq);
-      read_data();
-    }
-    Serial.printf("Setting waypoint lat : %f, lng : %f, height : %f\n", SENSOR_LOC[id[i]][0], SENSOR_LOC[id[i]][1], fly_altitude);
-    mavlink_message_t msg;
-    uint8_t buf[MAVLINK_MSG_ID_MISSION_ITEM_LEN];
+  uint8_t frame = MAV_FRAME_GLOBAL_RELATIVE_ALT; //lat, long, altitude is relative to home altitude in meters
+  uint8_t command = 16; //waypoint
+  uint8_t current = 0;
+  uint8_t cont = 1;
+  float param1 = 1;
+  float param2 = 1;
+  float param3 = 0;
+  float param4 = NAN;
+  int32_t lat = SENSOR_LOC[sensor_id - 1][0] * 1e7;
+  int32_t lng = SENSOR_LOC[sensor_id - 1][1] * 1e7;
+  float height = fly_altitude;
+  uint8_t mission_type = MAV_MISSION_TYPE_MISSION;
 
-    uint8_t frame = MAV_FRAME_GLOBAL_RELATIVE_ALT; //lat, long, altitude is relative to home altitude in meters
-    uint8_t command = 16; //waypoint
-    uint8_t current = 0;
-    uint8_t cont = 1;
-    float param1 = 1;
-    float param2 = 1;
-    float param3 = 0;
-    float param4 = NAN;
-    int32_t lat = SENSOR_LOC[id[i]][0] * 1e7;
-    int32_t lng = SENSOR_LOC[id[i]][1] * 1e7;
-    float height = fly_altitude;
-    uint8_t mission_type = MAV_MISSION_TYPE_MISSION;
+  mavlink_msg_mission_item_int_pack(
+    sys.sys_id, 
+    sys.comp_id, 
+    &msg, 
+    sys.tgt_sys, 
+    sys.tgt_comp, 
+    seq, 
+    frame, 
+    command, 
+    current, 
+    cont, 
+    param1, 
+    param2, 
+    param3, 
+    param4, 
+    lat, 
+    lng, 
+    height, 
+    mission_type
+  );
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
 
-    mavlink_msg_mission_item_int_pack(sys.sys_id, sys.comp_id, &msg, sys.tgt_sys, sys.tgt_comp, seq, frame, command, current, cont, param1, param2, param3, param4, lat, lng, height, mission_type);
-    uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+  Serial1.write(buf, len);
 
-    Serial1.write(buf, len);
-
-    Serial.printf("Mission sequence %u sent", seq);
-  }
-
-  while(mis_up_status != MAV_MISSION_ACCEPTED){
-    read_data();
-  }
-
-  start_mission();
+  Serial.printf("Mission sequence %u sent", seq);
 }
 
 void start_mission(){
@@ -166,172 +435,6 @@ void start_mission(){
   set_mode(MAV_MODE_STABILIZE_DISARMED);
 }
 
-void arm(){
-  Serial.println("Arming");
-  mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MSG_ID_COMMAND_LONG_LEN];
-
-  uint16_t command = 400; //arm disarm
-  uint8_t conf = 0;
-  float param1 = 1; //arm = 1
-
-  mavlink_msg_command_long_pack(sys.sys_id, sys.comp_id, &msg, sys.tgt_sys, sys.tgt_comp, command, conf, param1, 0, 0, 0, 0, 0, 0);
-  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
-
-  Serial1.write(buf, len);
-}
-
-void disarm(){
-  Serial.println("Disarming");
-  mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MSG_ID_COMMAND_LONG_LEN];
-
-  uint16_t command = 400; //arm disarm
-  uint8_t conf = 0;
-  float param1 = 0; //disarm = 0
-
-  mavlink_msg_command_long_pack(sys.sys_id, sys.comp_id, &msg, sys.tgt_sys, sys.tgt_comp, command, conf, param1, 0, 0, 0, 0, 0, 0);
-  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
-
-  Serial1.write(buf, len);
-}
-
-void takeoff(){
-  while(px_mode != MAV_MODE_FLAG_SAFETY_ARMED){
-    arm();
-  }
-
-  while(px_mode != MAV_MODE_FLAG_AUTO_ENABLED){
-    set_mode(MAV_MODE_AUTO_ARMED);
-  }
-
-  Serial.println("Taking off");
-  mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MSG_ID_COMMAND_LONG_LEN];
-
-  uint16_t command = 22; //takeoff
-  uint8_t conf = 0;
-  float param7 = fly_altitude;
-
-  mavlink_msg_command_long_pack(sys.sys_id, sys.comp_id, &msg, sys.tgt_sys, sys.tgt_comp, command, conf, 0, 0, 0, 0, 0, 0, param7);
-  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
-
-  Serial.write(buf, len);
-}
-
-void land(){
-  Serial.println("Taking off");
-  mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MSG_ID_COMMAND_LONG_LEN];
-
-  uint16_t command = 21; //land
-  uint8_t conf = 0;
-
-  //altitude determined by param7, here it is 0 relative to frame.
-  mavlink_msg_command_long_pack(sys.sys_id, sys.comp_id, &msg, sys.tgt_sys, sys.tgt_comp, command, conf, 0, 0, 0, 0, 0, 0, 0);
-  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
-
-  Serial.write(buf, len);
-
-  disarm();
-}
-
-void set_mode(const uint16_t& mode){
-  Serial.println("Setting mode to auto");
-  mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MSG_ID_COMMAND_LONG_LEN];
-
-  uint16_t command = 176; //do set mode
-  uint8_t conf = 0;
-  float param1 = mode; //auto disarmed
-
-  mavlink_msg_command_long_pack(sys.sys_id, sys.comp_id, &msg, sys.tgt_sys, sys.tgt_comp, command, conf, param1, 0, 0, 0, 0, 0, 0);
-  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
-  
-  Serial1.write(buf, len);
-}
-
-void return_to_launch(){
-  Serial.println("Returning to launch");
-
-  mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MSG_ID_COMMAND_LONG_LEN];
-
-  uint16_t command = 20; //return to launch
-  uint8_t conf = 0;
-
-  mavlink_msg_command_long_pack(sys.sys_id, sys.comp_id, &msg, sys.tgt_sys, sys.tgt_comp, command, conf, 0, 0, 0, 0, 0, 0, 0);
-  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
-
-  Serial1.write(buf, len);
-}
-
-void read_data(){
-  mavlink_message_t msg;
-  mavlink_status_t status;
- 
-  while(Serial1.available())
-  {
-    uint8_t c = Serial1.read();
- 
-    //Get new message
-    if(mavlink_parse_char(MAVLINK_COMM_0, c, &msg, &status))
-    {
- 
-    //Handle new message from autopilot
-      switch(msg.msgid)
-      {
-        case MAVLINK_MSG_ID_HEARTBEAT:
-          check_mode(msg);
-          break;
-        case MAVLINK_MSG_ID_MISSION_REQUEST_INT:
-          mission_request(msg);
-          break;
-        case MAVLINK_MSG_ID_MISSION_ACK:
-          uploaded_mission_status(msg);
-        case MAVLINK_MSG_ID_MISSION_ITEM_REACHED:
-          check_mission_progress(msg);
-          break;
-      }
-    }
-  }
-}
-
-void check_mode(mavlink_message_t msg){
-  mavlink_heartbeat_t hb;
-  mavlink_msg_heartbeat_decode(&msg, &hb);
-  px_mode = hb.base_mode;
-  px_status = hb.system_status;
-}
-
-void mission_request(mavlink_message_t msg){
-  mavlink_mission_request_int_t mis_req;
-  mavlink_msg_mission_request_int_decode(&msg, &mis_req);
-  seq_prev = seq; //retain previous sequence number
-  seq = mis_req.seq;
-  sys.tgt_sys = mis_req.target_system;
-  sys.tgt_comp = mis_req.target_component;
-  Serial.printf("Requesting for mission type %u sequence %u\n", mis_req.mission_type, seq);
-}
-
-void check_mission_progress(mavlink_message_t msg){
-  mavlink_mission_item_reached_t it;
-  mavlink_msg_mission_item_reached_decode(&msg, &it);
-  seq_prev = it.seq; //using same variable to save memory
-  Serial.printf("Mission sequence %u reached\n", seq_prev);
-}
-
-void uploaded_mission_status(mavlink_message_t msg){
-  mavlink_mission_ack_t mis_ack;
-  mavlink_msg_mission_ack_decode(&msg, &mis_ack);
-  mis_up_status = mis_ack.type;
-  if(mis_up_status == MAV_MISSION_ACCEPTED){
-    Serial.println("Mission accepted");
-  }else{
-    Serial.printf("Mission unaccepted with enum %u\n", mis_up_status);
-  }
-}
-
 void parseMsg(const String& msg) {
   static size_t pos[3];
   pos[0] = msg.indexOf('/');
@@ -341,6 +444,42 @@ void parseMsg(const String& msg) {
   pos[2] = msg.indexOf("/", pos[1]+1);
   sensData.moisture = msg.substring(pos[1]+1, pos[2]-pos[1]-1).toFloat();
   sensData.temp = msg.substring(pos[2]+1, msg.length()).toFloat();
+}
+
+// Function that gets current epoch time
+unsigned long getTime() {
+  time_t now;
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    return(0);
+  }
+  time(&now);
+  return now;
+}
+
+void POSTData(){
+  if(WiFi.status() == WL_CONNECTED){
+    HTTPClient http;
+
+    http.begin(serverName);
+    http.addHeader("Content-Type", "application/json");
+
+    String json;
+    serializeJson(sensors, json);
+
+    Serial.println(json);
+    int httpResponseCode = http.POST(json);
+    Serial.println(String(httpResponseCode));
+
+    if (httpResponseCode == 200) {
+      Serial.println("Data uploaded.");
+      delay(200);
+    } else {
+      Serial.println("ERROR: Couldn't upload data.");
+      delay(200);
+    }
+
+  }
 }
 
 void receivedCallback(uint32_t from, const String& msg ) {
@@ -356,43 +495,61 @@ void sendMsgRoutine() {
 
   // TODO: add BME688 readings
   bme.performReading();
-  Serial.print("Temperature = ");
-  Serial.print(bme.temperature);
-  Serial.println(" *C");
-
-  Serial.print("Pressure = ");
-  Serial.print(bme.pressure / 100.0);
-  Serial.println(" hPa");
-
-  Serial.print("Humidity = ");
-  Serial.print(bme.humidity);
-  Serial.println(" %");
-
-  Serial.print("Gas = ");
-  Serial.print(bme.gas_resistance / 1000.0);
-  Serial.println(" KOhms");
-
-  Serial.print("Approx. Altitude = ");
-  Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA));
-  Serial.println(" m");
 
   MQ131.update();
 
   sensData.ozone = MQ131.readSensorR0Rs();
 
   // TODO: send to back-end
+  if (millis() - dataMillis > 15000 || dataMillis == 0){
+    dataMillis = millis();
+
+    epochTime = getTime();
+
+    // get sensor number
+    uint8_t id = ((sensData.node_id - 1) - 1) * SENSOR_COUNT + sensData.sensor_id;
+
+    sensors[id]["temperature"] = sensData.temp;
+    sensors[id]["humidity"] = sensData.humid;
+    sensors[id]["moisture"] = sensData.moisture;
+    sensors[id]["timestamp"] = epochTime;
+
+    sensors["temperature"] = bme.temperature;
+    sensors["pressure"] = bme.pressure / 100.0;
+    sensors["humidity"] = bme.humidity;
+    sensors["gas"] = bme.gas_resistance / 1000.0;
+    sensors["ozone"] = sensData.ozone;
+
+    Serial.println("Uploading data... "); 
+    POSTData();
+  }
 }
 
 void setup() {
   Serial.begin(115200);
 
-  req_data_stream(); //request data from pixhawk (heartbeat, response, vehicle status, etc)
-
-  while(px_status != MAV_STATE_STANDBY){
-    Serial.println("Pixhawk not on standby!");
-    read_data();
-    delay(2000);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.print("Connecting to Wi-Fi");
+  while (WiFi.status() != WL_CONNECTED)
+  {
+      Serial.print(".");
+      delay(300);
   }
+  Serial.println();
+  Serial.print("Connected with IP: ");
+  Serial.println(WiFi.localIP());
+  Serial.println();
+
+  configTime(0, 0, ntpServer);
+
+  req_data_stream(); //request data from pixhawk (heartbeat, response, vehicle status, etc)
+  read_data();
+
+  // while(px_status != MAV_STATE_STANDBY){
+  //   Serial.println("Pixhawk not on standby!");
+  //   read_data();
+  //   delay(2000);
+  // }
 
   send_msg_task = std::make_shared<Task>(UPDATE_RATE, TASK_FOREVER, sendMsgRoutine);
 
@@ -444,9 +601,6 @@ void loop() {
 // === END OF CENTRAL MODULE SOURCE CODE SECTION ===
 #else
 // === NODE MODULE SECTION SOURCE CODE ===
-constexpr uint8_t dht_sensor_count = sizeof(DHT_SENSOR_PINS)/sizeof(DHT_SENSOR_PINS[0]);
-constexpr uint8_t moist_sensor_count = sizeof(MOIST_SENSOR_PINS)/sizeof(MOIST_SENSOR_PINS[0]);
-constexpr uint8_t SENSOR_COUNT = floor( (dht_sensor_count + moist_sensor_count) / 2 );
 
 #include <yl3869.h>
 #include "DHTesp.h"
@@ -481,8 +635,8 @@ String packMsg(uint8_t idx) {
 
 void readSensorRoutine() {
   for (i = 0; i < SENSOR_COUNT; i++) {
-    humid[i] = 83;     //dht[i-1].getHumidity();
-    temp[i] = 20;      //dht[i-1].getTemperature();  
+    humid[i] = dht[i-1]->getHumidity();
+    temp[i] = dht[i-1]->getTemperature();  
     moisture[i] = 32;  //yl3869[i-1].read();
   }
 
