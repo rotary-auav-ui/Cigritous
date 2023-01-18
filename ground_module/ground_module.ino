@@ -35,7 +35,7 @@ constexpr float fly_altitude = 2; //relative to home
 #define NUM_OF_MISSION 3
 
 //TODO: Add BME688
-Adafruit_BME680 bme(BME_CS, BME_MOSI, BME_MISO, BME_SCK);
+Adafruit_BME680 bme;
 MQUnifiedsensor MQ131(BOARD, V_RES, ADC_BIT, MQ131_PIN, "MQ-131");
 
 Scheduler mainscheduler; // task scheduler
@@ -436,13 +436,13 @@ void start_mission(){
 
 void parseMsg(const String& msg) {
   static size_t pos[3];
-  pos[0] = msg.indexOf('/');
+  pos[0] = msg.indexOf('/'); //1
   sensData.sensor_id = msg.substring(0, pos[0]).toInt();
-  pos[1] = msg.indexOf("/", pos[0]+1);
-  sensData.humid = msg.substring(pos[0]+1, pos[1]-pos[0]-1).toFloat();
+  pos[1] = msg.indexOf("/", pos[0]+1); //7
+  sensData.humid = msg.substring(pos[0]+1, pos[1]-1).toFloat();
   pos[2] = msg.indexOf("/", pos[1]+1);
-  sensData.moisture = msg.substring(pos[1]+1, pos[2]-pos[1]-1).toFloat();
-  sensData.temp = msg.substring(pos[2]+1, msg.length()).toFloat();
+  sensData.temp = msg.substring(pos[1]+1, pos[2]-1).toFloat();
+  sensData.moisture = msg.substring(pos[2]+1, msg.length()).toFloat();
 }
 
 // Function that gets current epoch time
@@ -508,15 +508,16 @@ void sendMsgRoutine() {
     // get sensor number
     uint8_t id = ((sensData.node_id - 1) - 1) * SENSOR_COUNT + sensData.sensor_id;
 
-    sensors[id]["temperature"] = sensData.temp;
-    sensors[id]["humidity"] = sensData.humid;
-    sensors[id]["moisture"] = sensData.moisture;
-    sensors[id]["timestamp"] = epochTime;
+    sensors[id]["dht_temperature"] = sensData.temp;
+    sensors[id]["dht_humidity"] = sensData.humid;
+    sensors[id]["dht_moisture"] = sensData.moisture;
+    sensors[id]["dht_timestamp"] = epochTime;
 
-    sensors["temperature"] = bme.temperature;
-    sensors["pressure"] = bme.pressure / 100.0;
-    sensors["humidity"] = bme.humidity;
-    sensors["gas"] = bme.gas_resistance / 1000.0;
+    sensors["bme_temperature"] = bme.temperature;
+    sensors["bme_pressure"] = bme.pressure / 100.0;
+    sensors["bme_humidity"] = bme.humidity;
+    sensors["bme_gas"] = bme.gas_resistance / 1000.0;
+    Serial.printf("%f %f %f %f %f %f %f\n", bme.temperature, bme.pressure, bme.humidity, bme.gas_resistance, sensData.temp, sensData.humid, sensData.moisture);
     sensors["ozone"] = sensData.ozone;
 
     Serial.println("Uploading data... "); 
@@ -634,9 +635,9 @@ String packMsg(uint8_t idx) {
 
 void readSensorRoutine() {
   for (i = 0; i < SENSOR_COUNT; i++) {
-    humid[i] = dht[i-1]->getHumidity();
-    temp[i] = dht[i-1]->getTemperature();  
-    moisture[i] = 32;  //yl3869[i-1].read();
+    humid[i] = dht[i]->getHumidity();
+    temp[i] = dht[i]->getTemperature();  
+    moisture[i] = 32;  //yl3869[i].read();
   }
 
   Serial.println("Sensor data read");
@@ -696,11 +697,11 @@ void setup() {
   for(i = 0; i < SENSOR_COUNT; i++) {
     sensor_id[i] = i+1;
     
-    dht[i] = std::make_shared<DHTesp>(DHT_SENSOR_PINS[i], models::DHT22); // add define DHT models later
+    dht[i] = std::make_shared<DHTesp>(DHT_SENSOR_PINS[i], models::DHT11); // add define DHT models later
     dht[i]->begin();
     
-    yl3869[i] = std::make_shared<YL3869>(MOIST_SENSOR_PINS[i]);
-    yl3869[i]->init();
+    // yl3869[i] = std::make_shared<YL3869>(MOIST_SENSOR_PINS[i]);
+    // yl3869[i]->init();
   }
 
   send_msg_task = std::make_shared<Task>(TASK_MILLISECOND, TASK_ONCE, readSensorRoutine);
