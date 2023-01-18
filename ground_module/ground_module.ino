@@ -60,7 +60,6 @@ const char* serverName = "https://data.mongodb-api.com/app/data-kmljr/endpoint/E
 
 // StaticJsonDocument<JSON_OBJECT_SIZE(5)> central;
 StaticJsonDocument<JSON_OBJECT_SIZE(5) + JSON_ARRAY_SIZE(TOTAL_NODE * SENSOR_COUNT) + (TOTAL_NODE * SENSOR_COUNT) * JSON_OBJECT_SIZE(4)> sensors;
- 
 
 struct {
   uint8_t sensor_id;
