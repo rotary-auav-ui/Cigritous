@@ -14,10 +14,7 @@ constexpr float fly_altitude = 2; //relative to home
 #include "Adafruit_BME680.h"
 
 //sending to backend
-#include "time.h"
-#include <WiFi.h>
-#include <HTTPClient.h>
-#include <ArduinoJson.h>
+#include "EspMQTTClient.h"
 
 //mavlink
 #include <mavlink_commands.hpp>
@@ -41,6 +38,16 @@ painlessMesh mesh;
 std::shared_ptr<Task> send_msg_task;
 
 std::shared_ptr<Mavlink> mavlink;
+
+EspMQTTClient client(
+  WIFI_SSID,
+  WIFI_PASSWORD,
+  "192.168.1.100", // Ip of broker server
+  "Cigritous",
+  "Cigritous",
+  "Central",
+  1883
+);
 
 uint8_t i = 0;
 // static float home_location[2], sensor_loc[SENSOR_COUNT][2]; //read from backend in init_sensor_location
@@ -137,6 +144,7 @@ void sendMsgRoutine() {
   // TODO : Set thresholds for certain plants and saves their respective sensor id.
 
   // TODO: send to back-end
+
   // if (millis() - dataMillis > 15000 || dataMillis == 0){
   //   dataMillis = millis();
 
@@ -162,12 +170,27 @@ void sendMsgRoutine() {
   // }
 }
 
+// This function is called once everything is connected (Wifi and MQTT)
+// WARNING : YOU MUST IMPLEMENT IT IF YOU USE EspMQTTClient
+void onConnectionEstablished()
+{
+  client.publish("central/bme/temp", String(bme.temperature));
+  client.publish("central/bme/press", String(bme.pressure));
+  client.publish("central/bme/humid", String(bme.humidity));
+
+}
+
 void setup() {
   Serial.begin(115200);
 
   mavlink = std::make_shared<Mavlink>(115200, 16, 17); // Using UART2
   mavlink->req_data_stream();
   mavlink->read_data();
+
+  client.enableDebuggingMessages(); // Enable debugging messages sent to serial output
+  client.enableHTTPWebUpdater(); // Enable the web updater. User and password default to values of MQTTUsername and MQTTPassword. These can be overridded with enableHTTPWebUpdater("user", "password").
+  client.enableOTA(); // Enable OTA (Over The Air) updates. Password defaults to MQTTPassword. Port is the default OTA port. Can be overridden with enableOTA("password", port).
+  client.enableLastWillMessage("TestClient/lastwill", "I am going offline");  // You can activate the retain flag by setting the third parameter to true
 
   // WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   // Serial.print("Connecting to Wi-Fi");
@@ -184,11 +207,11 @@ void setup() {
   // configTime(0, 0, ntpServer);
 
   // Receive heartbeat
-  while(mavlink->get_px_status() != MAV_STATE_STANDBY){
-    Serial.println("Pixhawk not on standby!");
-    mavlink->read_data();
-    delay(300);
-  }
+  // while(mavlink->get_px_status() != MAV_STATE_STANDBY){
+  //   Serial.println("Pixhawk not on standby!");
+  //   mavlink->read_data();
+  //   delay(300);
+  // }
 
   send_msg_task = std::make_shared<Task>(UPDATE_RATE, TASK_FOREVER, sendMsgRoutine);
 
@@ -234,6 +257,8 @@ void setup() {
 void loop() {
   // it will run the user scheduler as well
   mesh.update();
+
+  client.loop();
 }
 
 // === END OF CENTRAL MODULE SOURCE CODE SECTION ===
