@@ -40,3 +40,6 @@
 [submodule "libraries/--force"]
 	path = libraries/--force
 	url = https://github.com/rotary-auav-ui/mavlink-c-library.git
+[submodule "mavlink-c-library"]
+	path = mavlink-c-library
+	url = https://github.com/rotary-auav-ui/mavlink-c-library.git
