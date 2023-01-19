@@ -10,9 +10,6 @@
 [submodule "libraries/DHTesp"]
 	path = libraries/DHTesp
 	url = https://github.com/rotary-auav-ui/DHTesp.git
-[submodule "libraries/mavlink-c-library"]
-	path = libraries/mavlink-c-library
-	url = https://github.com/rotary-auav-ui/mavlink-c-library.git
 [submodule "libraries/-b"]
 	path = libraries/-b
 	url = https://github.com/miguel5612/MQSensorsLib.git
@@ -40,3 +37,6 @@
 [submodule "libraries/Adafruit_Sensor"]
 	path = libraries/Adafruit_Sensor
 	url = https://github.com/adafruit/Adafruit_Sensor.git
+[submodule "libraries/--force"]
+	path = libraries/--force
+	url = https://github.com/rotary-auav-ui/mavlink-c-library.git
