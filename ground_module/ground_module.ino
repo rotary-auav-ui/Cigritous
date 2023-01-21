@@ -14,7 +14,9 @@ constexpr float fly_altitude = 2; //relative to home
 #include "Adafruit_BME680.h"
 
 //sending to backend
-#include "EspMQTTClient.h"
+#include <WiFi.h>
+#include <PubSubClient.h>
+// #include "EspMQTTClient.h"
 
 //mavlink
 #include <mavlink_commands.hpp>
@@ -28,7 +30,12 @@ constexpr float fly_altitude = 2; //relative to home
 
 #define NUM_OF_MISSION 3
 
+WiFiClient wifiClient;
+
+PubSubClient client(wifiClient);
+
 Adafruit_BME680 bme;
+
 MQUnifiedsensor MQ131(BOARD, V_RES, ADC_BIT, MQ131_PIN, "MQ-131");
 
 Scheduler mainscheduler; // task scheduler
@@ -39,28 +46,21 @@ std::shared_ptr<Task> send_msg_task;
 
 std::shared_ptr<Mavlink> mavlink;
 
-EspMQTTClient client(
-  WIFI_SSID,
-  WIFI_PASSWORD,
-  "192.168.1.100", // Ip of broker server
-  "Cigritous",
-  "Cigritous",
-  "Central",
-  1883
-);
+// EspMQTTClient client(
+//   WIFI_SSID,
+//   WIFI_PASSWORD,
+//   "test.mosquitto.org", // Ip of broker server
+//   "Cigritous",
+//   "Cigritous",
+//   "Central",
+//   1883
+// );
 
 uint8_t i = 0;
+uint8_t id;
+uint8_t queue[SENSOR_THRES] = {0};
+bool full;
 // static float home_location[2], sensor_loc[SENSOR_COUNT][2]; //read from backend in init_sensor_location
-
-// //backend informations 
-// unsigned long epochTime; 
-// unsigned long dataMillis = 0;
-
-// const char* ntpServer = "id.pool.ntp.org";
-// const char* serverName = "https://data.mongodb-api.com/app/data-kmljr/endpoint/ESP32";
-
-// StaticJsonDocument<JSON_OBJECT_SIZE(5)> central;
-// StaticJsonDocument<JSON_OBJECT_SIZE(5) + JSON_ARRAY_SIZE(TOTAL_NODE * SENSOR_COUNT) + (TOTAL_NODE * SENSOR_COUNT) * JSON_OBJECT_SIZE(4)> sensors;
 
 struct {
   uint8_t sensor_id;
@@ -87,41 +87,6 @@ void parseMsg(const String& msg) {
   sensData.moisture = msg.substring(pos[2]+1, msg.length()).toFloat();
 }
 
-// // Function that gets current epoch time
-// unsigned long getTime() {
-//   time_t now;
-//   struct tm timeinfo;
-//   if (!getLocalTime(&timeinfo)) {
-//     return(0);
-//   }
-//   time(&now);
-//   return now;
-// }
-
-// void POSTData(){
-//   if(WiFi.status() == WL_CONNECTED){
-//     HTTPClient http;
-
-//     http.begin(serverName);
-//     http.addHeader("Content-Type", "application/json");
-
-//     String json;
-//     serializeJson(sensors, json);
-
-//     Serial.println(json);
-//     int httpResponseCode = http.POST(json);
-//     Serial.println(String(httpResponseCode));
-
-//     if (httpResponseCode == 200) {
-//       Serial.println("Data uploaded.");
-//       delay(200);
-//     } else {
-//       Serial.println("ERROR: Couldn't upload data.");
-//       delay(200);
-//     }
-
-//   }
-// }
 
 void receivedCallback(uint32_t from, const String& msg ) {
   Serial.printf("RECV: %u msg=%s\n", from, msg.c_str());
@@ -135,50 +100,118 @@ void receivedCallback(uint32_t from, const String& msg ) {
 void sendMsgRoutine() {
 
   // TODO: add BME688 readings
-  bme.performReading();
+  if(!bme.performReading()){
+    Serial.println("BME688 failed to perform reading!");
+  }
 
   MQ131.update();
 
   sensData.ozone = MQ131.readSensorR0Rs();
 
+  id = ((sensData.node_id - 1) - 1) * SENSOR_COUNT + sensData.sensor_id;
+
   // TODO : Set thresholds for certain plants and saves their respective sensor id.
 
   // TODO: send to back-end
 
-  // if (millis() - dataMillis > 15000 || dataMillis == 0){
-  //   dataMillis = millis();
+  Serial.println(String(bme.temperature) + " " + String(bme.pressure) + " " + String(bme.humidity) + " " + String(bme.gas_resistance));
 
-  //   epochTime = getTime();
 
-  //   // get sensor number
-  //   uint8_t id = ((sensData.node_id - 1) - 1) * SENSOR_COUNT + sensData.sensor_id;
 
-  //   sensors[id]["dht_temperature"] = sensData.temp;
-  //   sensors[id]["dht_humidity"] = sensData.humid;
-  //   sensors[id]["dht_moisture"] = sensData.moisture;
-  //   sensors[id]["dht_timestamp"] = epochTime;
+  if(sensData.temp > TEMP_THRES && 
+    sensData.humid < HUMID_THRES && 
+    sensData.moisture < MOIST_THRES
+  ){
+    for(i = 0; i < SENSOR_THRES; i++){
+      if(queue[i] == 0){ 
+        queue[i] = id;
+        if(i == SENSOR_THRES - 1) 
+          full = true;
+      }
+    }
+  }
+}
 
-  //   sensors["bme_temperature"] = bme.temperature;
-  //   sensors["bme_pressure"] = bme.pressure / 100.0;
-  //   sensors["bme_humidity"] = bme.humidity;
-  //   sensors["bme_gas"] = bme.gas_resistance / 1000.0;
-  //   Serial.printf("%f %f %f %f %f %f %f\n", bme.temperature, bme.pressure, bme.humidity, bme.gas_resistance, sensData.temp, sensData.humid, sensData.moisture);
-  //   sensors["ozone"] = sensData.ozone;
+void init_wifi(){
+  delay(10);
+  Serial.print("Connecting to ");
+  Serial.println(WIFI_SSID);
+  while (WiFi.status() != WL_CONNECTED) {
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    delay(500);
+    Serial.print(".");
+  }
+  randomSeed(micros());
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+}
 
-  //   Serial.println("Uploading data... "); 
-  //   POSTData();
-  // }
+void reconnect() {
+  // Loop until we're reconnected
+  while (!client.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    // Create a random client ID
+    String clientId = "ESP32Client-";
+    clientId += String(random(0xffff), HEX);
+    // Attempt to connect
+    if (client.connect(clientId.c_str(), MQTT_USERNAME, MQTT_PASSWORD)) {
+      Serial.println("connected");
+      //Once connected, publish an announcement...
+      client.publish("/hello", "Hello from central");
+      // ... and resubscribe
+      // client.subscribe(MQTT_SERIAL_RECEIVER_CH);
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" try again in 5 seconds");
+      // Wait 5 seconds before retrying
+      delay(5000);
+    }
+  }
+}
+
+// void subscribe_cb(char* topic, byte *payload, unsigned int length) {
+//     Serial.println("-------new message from broker-----");
+//     Serial.print("channel:");
+//     Serial.println(topic);
+//     Serial.print("data:");  
+//     Serial.write(payload, length);
+//     Serial.println();
+// }
+
+void publish_sensor_data(){
+  Serial.println("Publishing sensor data");
+  client.publish("central/temp", (String(bme.temperature)).c_str());
+  client.publish("central/press", (String(bme.pressure)).c_str());
+  client.publish("central/humid", (String(bme.humidity)).c_str());
+  client.publish("central/gas", (String(bme.gas_resistance)).c_str());
+  client.publish("node/temp", (String(id) + "/" + String(sensData.temp)).c_str());
+  client.publish("node/humid", (String(id) + "/" + String(sensData.humid)).c_str());
+  client.publish("node/moist", (String(id) + "/" + String(sensData.moisture)).c_str());
+  // client.publish("central/temp", "32");
+  // client.publish("central/press", "10000");
+  // client.publish("central/humid", "66");
+  // client.publish("central/gas", "123");
+  // client.publish("node/temp", "33");
+  // client.publish("node/humid", "50");
+  // client.publish("node/moist", "33");
 }
 
 // This function is called once everything is connected (Wifi and MQTT)
 // WARNING : YOU MUST IMPLEMENT IT IF YOU USE EspMQTTClient
-void onConnectionEstablished()
-{
-  client.publish("central/bme/temp", String(bme.temperature));
-  client.publish("central/bme/press", String(bme.pressure));
-  client.publish("central/bme/humid", String(bme.humidity));
+// void onConnectionEstablished()
+// {
+//   client.publish("central/temp", String(bme.temperature));
+//   client.publish("central/press", String(bme.pressure));
+//   client.publish("central/humid", String(bme.humidity));
+//   client.publish("central/gas", String(bme.gas_resistance));
+//   client.publish("node/temp", String(id) + "/" + String(sensData.temp));
+//   client.publish("node/humid", String(id) + "/" + String(sensData.humid));
+//   client.publish("node/moist", String(id) + "/" + String(sensData.moisture));
 
-}
+// }
 
 void setup() {
   Serial.begin(115200);
@@ -187,22 +220,24 @@ void setup() {
   mavlink->req_data_stream();
   mavlink->read_data();
 
-  client.enableDebuggingMessages(); // Enable debugging messages sent to serial output
-  client.enableHTTPWebUpdater(); // Enable the web updater. User and password default to values of MQTTUsername and MQTTPassword. These can be overridded with enableHTTPWebUpdater("user", "password").
-  client.enableOTA(); // Enable OTA (Over The Air) updates. Password defaults to MQTTPassword. Port is the default OTA port. Can be overridden with enableOTA("password", port).
-  client.enableLastWillMessage("TestClient/lastwill", "I am going offline");  // You can activate the retain flag by setting the third parameter to true
+  
+  // send_msg_task = std::make_shared<Task>(UPDATE_RATE, TASK_FOREVER, sendMsgRoutine);
 
-  // WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  // Serial.print("Connecting to Wi-Fi");
-  // while (WiFi.status() != WL_CONNECTED)
-  // {
-  //     Serial.print(".");
-  //     delay(300);
-  // }
-  // Serial.println();
-  // Serial.print("Connected with IP: ");
-  // Serial.println(WiFi.localIP());
-  // Serial.println();
+  // mesh.setDebugMsgTypes( ERROR | STARTUP );  // set before init() so that you can see startup messages
+
+  // mesh.init(WIFI_SSID, WIFI_PASSWORD, mainscheduler, MQTT_PORT, WIFI_AP, 1);
+
+  // // mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP, 1); // Central node number will always be 1
+  // mesh.onReceive(&receivedCallback);
+
+  // mainscheduler.addTask(ConvTask::getFromShared(send_msg_task));
+  // send_msg_task->enable();
+
+  init_wifi();
+  client.setServer(MQTT_SERVER, MQTT_PORT);
+  // client.setCallback(callback);
+  reconnect();
+
 
   // configTime(0, 0, ntpServer);
 
@@ -213,9 +248,9 @@ void setup() {
   //   delay(300);
   // }
 
-  send_msg_task = std::make_shared<Task>(UPDATE_RATE, TASK_FOREVER, sendMsgRoutine);
-
-  bme.begin();
+  while(!bme.begin()){
+    Serial.println("BME is not connected!");
+  }
   // Set up oversampling and filter initialization
   bme.setTemperatureOversampling(BME680_OS_8X);
   bme.setHumidityOversampling(BME680_OS_2X);
@@ -244,21 +279,44 @@ void setup() {
 
   if(isinf(calcR0_131)) {Serial.println("Warning: Conection issue on MQ131, R0 is infinite (Open circuit detected) please check your wiring and supply");}
   if(calcR0_131 == 0){Serial.println("Warning: Conection issue found on MQ131, R0 is zero (Analog pin shorts to ground) please check your wiring and supply");}
-  
-  mesh.setDebugMsgTypes( ERROR | STARTUP );  // set before init() so that you can see startup messages
 
-  mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP, 1); // Central node number will always be 1
-  mesh.onReceive(&receivedCallback);
-
-  mainscheduler.addTask(ConvTask::getFromShared(send_msg_task));
-  send_msg_task->enable();
 }
 
 void loop() {
   // it will run the user scheduler as well
-  mesh.update();
+  // mesh.update();
+
+  if (!client.connected()) {
+    reconnect();
+  }
 
   client.loop();
+
+  bme.performReading();
+
+  publish_sensor_data();
+  delay(1000);
+
+  if(full){ // check if queue is full
+    mavlink->send_mission_count(SENSOR_THRES);
+    for(i = 0; i < SENSOR_THRES; i++){
+      while(mavlink->get_mis_req_status()){
+        mavlink->read_data(); // Wait for a request
+      }
+      mavlink->send_mission_item(SENSOR_LOC[queue[i] - 1][0], SENSOR_LOC[queue[i] - 1][1], fly_altitude);
+    }
+    delay(100);
+    
+    mavlink->takeoff(fly_altitude);
+
+    mavlink->start_mission();
+
+    mavlink->land();
+
+    for(i = 0; i < SENSOR_THRES; i++){
+      queue[i] = 0;
+    }
+  }
 }
 
 // === END OF CENTRAL MODULE SOURCE CODE SECTION ===
@@ -369,7 +427,7 @@ void setup() {
 
   send_msg_task = std::make_shared<Task>(TASK_MILLISECOND, TASK_ONCE, readSensorRoutine);
   
-  mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP_STA, NODE_NUMBER);  // node number can be changed from settings.h
+  mesh.init(WIFI_SSID, WIFI_PASSWORD, mainscheduler, MQTT_PORT, WIFI_AP_STA, NODE_NUMBER);  // node number can be changed from settings.h
   mesh.onReceive(&receivedCallback);
   mesh.onNewConnection(newConnectionCallback);
 
