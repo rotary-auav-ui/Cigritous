@@ -16,7 +16,6 @@ constexpr float fly_altitude = 2; //relative to home
 //sending to backend
 #include <WiFi.h>
 #include <PubSubClient.h>
-// #include "EspMQTTClient.h"
 
 //mavlink
 #include <mavlink_commands.hpp>
@@ -43,18 +42,9 @@ Scheduler mainscheduler; // task scheduler
 painlessMesh mesh;
 
 std::shared_ptr<Task> send_msg_task;
+std::shared_ptr<Task> mavlink_task;
 
 std::shared_ptr<Mavlink> mavlink;
-
-// EspMQTTClient client(
-//   WIFI_SSID,
-//   WIFI_PASSWORD,
-//   "test.mosquitto.org", // Ip of broker server
-//   "Cigritous",
-//   "Cigritous",
-//   "Central",
-//   1883
-// );
 
 uint8_t i = 0;
 uint8_t id;
@@ -99,7 +89,6 @@ void receivedCallback(uint32_t from, const String& msg ) {
 
 void sendMsgRoutine() {
 
-  // TODO: add BME688 readings
   if(!bme.performReading()){
     Serial.println("BME688 failed to perform reading!");
   }
@@ -116,7 +105,7 @@ void sendMsgRoutine() {
 
   Serial.println(String(bme.temperature) + " " + String(bme.pressure) + " " + String(bme.humidity) + " " + String(bme.gas_resistance));
 
-
+  publish_sensor_data();
 
   if(sensData.temp > TEMP_THRES && 
     sensData.humid < HUMID_THRES && 
@@ -190,56 +179,44 @@ void publish_sensor_data(){
   client.publish("node/temp", (String(id) + "/" + String(sensData.temp)).c_str());
   client.publish("node/humid", (String(id) + "/" + String(sensData.humid)).c_str());
   client.publish("node/moist", (String(id) + "/" + String(sensData.moisture)).c_str());
-  // client.publish("central/temp", "32");
-  // client.publish("central/press", "10000");
-  // client.publish("central/humid", "66");
-  // client.publish("central/gas", "123");
-  // client.publish("node/temp", "33");
-  // client.publish("node/humid", "50");
-  // client.publish("node/moist", "33");
 }
 
-// This function is called once everything is connected (Wifi and MQTT)
-// WARNING : YOU MUST IMPLEMENT IT IF YOU USE EspMQTTClient
-// void onConnectionEstablished()
-// {
-//   client.publish("central/temp", String(bme.temperature));
-//   client.publish("central/press", String(bme.pressure));
-//   client.publish("central/humid", String(bme.humidity));
-//   client.publish("central/gas", String(bme.gas_resistance));
-//   client.publish("node/temp", String(id) + "/" + String(sensData.temp));
-//   client.publish("node/humid", String(id) + "/" + String(sensData.humid));
-//   client.publish("node/moist", String(id) + "/" + String(sensData.moisture));
-
-// }
+void recieveMavlink() {
+  mavlink->read_data();
+}
 
 void setup() {
   Serial.begin(115200);
 
   mavlink = std::make_shared<Mavlink>(115200, 16, 17); // Using UART2
   mavlink->req_data_stream();
-  mavlink->read_data();
 
+  send_msg_task = std::make_shared<Task>(UPDATE_RATE, TASK_FOREVER, sendMsgRoutine);
+  mavlink_task = std::make_shared<Task>(TASK_MILLISECOND, TASK_FOREVER, recieveMavlink);
+
+  mesh.setDebugMsgTypes( ERROR | STARTUP );  // set before init() so that you can see startup messages
+
+  mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP_STA, 1); // Central node number will always be 1
   
-  // send_msg_task = std::make_shared<Task>(UPDATE_RATE, TASK_FOREVER, sendMsgRoutine);
+  mesh.onReceive(&receivedCallback);
 
-  // mesh.setDebugMsgTypes( ERROR | STARTUP );  // set before init() so that you can see startup messages
+  mainscheduler.addTask(ConvTask::getFromShared(send_msg_task));
+  mainscheduler.addTask(ConvTask::getFromShared(mavlink_task));
 
-  // mesh.init(WIFI_SSID, WIFI_PASSWORD, mainscheduler, MQTT_PORT, WIFI_AP, 1);
+  send_msg_task->enable();
+  mavlink_task->enable();
 
-  // // mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP, 1); // Central node number will always be 1
-  // mesh.onReceive(&receivedCallback);
+  mesh.stationManual(WIFI_SSID, WIFI_PASSWORD);
+  mesh.setHostname("CENTRAL");
 
-  // mainscheduler.addTask(ConvTask::getFromShared(send_msg_task));
-  // send_msg_task->enable();
+  mesh.setRoot(true);
+
+  mesh.setContainsRoot(true);
 
   init_wifi();
   client.setServer(MQTT_SERVER, MQTT_PORT);
-  // client.setCallback(callback);
+  // client.setCallback(callback); // for subscribing later
   reconnect();
-
-
-  // configTime(0, 0, ntpServer);
 
   // Receive heartbeat
   // while(mavlink->get_px_status() != MAV_STATE_STANDBY){
@@ -251,6 +228,7 @@ void setup() {
   while(!bme.begin()){
     Serial.println("BME is not connected!");
   }
+
   // Set up oversampling and filter initialization
   bme.setTemperatureOversampling(BME680_OS_8X);
   bme.setHumidityOversampling(BME680_OS_2X);
@@ -284,7 +262,7 @@ void setup() {
 
 void loop() {
   // it will run the user scheduler as well
-  // mesh.update();
+  mesh.update();
 
   if (!client.connected()) {
     reconnect();
@@ -292,17 +270,10 @@ void loop() {
 
   client.loop();
 
-  bme.performReading();
-
-  publish_sensor_data();
-  delay(1000);
-
   if(full){ // check if queue is full
     mavlink->send_mission_count(SENSOR_THRES);
     for(i = 0; i < SENSOR_THRES; i++){
-      while(mavlink->get_mis_req_status()){
-        mavlink->read_data(); // Wait for a request
-      }
+      while(mavlink->get_mis_req_status()); //wait for a request
       mavlink->send_mission_item(SENSOR_LOC[queue[i] - 1][0], SENSOR_LOC[queue[i] - 1][1], fly_altitude);
     }
     delay(100);
@@ -358,7 +329,7 @@ void readSensorRoutine() {
   for (i = 0; i < SENSOR_COUNT; i++) {
     humid[i] = dht[i]->getHumidity();
     temp[i] = dht[i]->getTemperature();  
-    moisture[i] = 32;  //yl3869[i].read();
+    moisture[i] = 32; // yl3869[i]->read();
   }
 
   Serial.println("Sensor data read");
@@ -425,9 +396,9 @@ void setup() {
     // yl3869[i]->init();
   }
 
-  send_msg_task = std::make_shared<Task>(TASK_MILLISECOND, TASK_ONCE, readSensorRoutine);
+  send_msg_task = std::make_shared<Task>(TASK_MILLISECOND*100, TASK_ONCE, readSensorRoutine);
   
-  mesh.init(WIFI_SSID, WIFI_PASSWORD, mainscheduler, MQTT_PORT, WIFI_AP_STA, NODE_NUMBER);  // node number can be changed from settings.h
+  mesh.init(MEST_PREFIX, MEST_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP_STA, NODE_NUMBER);  // node number can be changed from settings.h
   mesh.onReceive(&receivedCallback);
   mesh.onNewConnection(newConnectionCallback);
 
