@@ -82,10 +82,10 @@ void parseMsg(const String& msg) {
   pos[2] = msg.indexOf("/", pos[1]+1);
   sens = msg.substring(0, pos[0]).toInt();
   total_id = ((node - 1) - 1) * SENSOR_COUNT + sens;
-  sensData[total_id].id = total_id;
-  sensData[total_id].temp = msg.substring(pos[1]+1, pos[2]-1).toFloat();
-  sensData[total_id].moisture = msg.substring(pos[2]+1, msg.length()).toFloat();
-  sensData[total_id].humid = msg.substring(pos[0]+1, pos[1]-1).toFloat();
+  sensData[total_id - 1].id = total_id;
+  sensData[total_id - 1].temp = msg.substring(pos[1]+1, pos[2]-1).toFloat();
+  sensData[total_id - 1].moisture = msg.substring(pos[2]+1, msg.length()).toFloat();
+  sensData[total_id - 1].humid = msg.substring(pos[0]+1, pos[1]-1).toFloat();
   Serial.println(
     String(sensData[total_id - 1].id) + " " +
     String(sensData[total_id - 1].temp) + " " +
@@ -179,9 +179,9 @@ void publish_sensor_data(){
   mqttClient.publish("/central/humid", "67");
   mqttClient.publish("/central/gas", "11000");
   for(i = 1; i <= TOTAL_NODE * SENSOR_COUNT; i++){
-    mqttClient.publish(("/" + String(i) + "/temp").c_str(), String(sensData[i].temp).c_str());
-    mqttClient.publish(("/" + String(i) + "/humid").c_str(), String(sensData[i].humid).c_str());
-    mqttClient.publish(("/" + String(i) + "/moist").c_str(), String(sensData[i].moisture).c_str());
+    mqttClient.publish(("/" + String(i) + "/temp").c_str(), String(sensData[i - 1].temp).c_str());
+    mqttClient.publish(("/" + String(i) + "/humid").c_str(), String(sensData[i - 1].humid).c_str());
+    mqttClient.publish(("/" + String(i) + "/moist").c_str(), String(sensData[i - 1].moisture).c_str());
   }
 }
 
@@ -195,9 +195,9 @@ void setup() {
   mavlink = std::make_shared<Mavlink>(115200, 16, 17); // Using UART2
   mavlink->req_data_stream();
 
-  mesh.setDebugMsgTypes( ERROR | STARTUP);  // set before init() so that you can see startup messages
+  mesh.setDebugMsgTypes( ERROR | STARTUP | CONNECTION);  // set before init() so that you can see startup messages
 
-  mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP_STA, 1); // Central node number will always be 1
+  mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP_STA, 1, 6); // Central node number will always be 1
   mesh.onReceive(&receivedCallback);
   mesh.stationManual(WIFI_SSID, WIFI_PASSWORD);
   mesh.setHostname("Cigritous");
@@ -391,7 +391,7 @@ void setup() {
 
   send_msg_task = std::make_shared<Task>(TASK_MILLISECOND, TASK_ONCE, readSensorRoutine);
   
-  mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP_STA, NODE_NUMBER);  // node number can be changed from settings.h
+  mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP_STA, NODE_NUMBER, 6);  // node number can be changed from settings.h
   mesh.onReceive(&receivedCallback);
   mesh.onNewConnection(newConnectionCallback);
   mesh.setContainsRoot(true);

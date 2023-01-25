@@ -3,10 +3,10 @@
 If you want to flash central module code, use #define with CENTRAL_MODULE 
 If you want to flash node module code, use #define with NODE_MODULE and set the node number
 */
-// #define CENTRAL_MODULE
-#define NODE_MODULE 
+#define CENTRAL_MODULE
+// #define NODE_MODULE 
 
-//Please define node number sequentially
+// Please define node number sequentially
 #define NODE_NUMBER 2
 
 #define MESH_PREFIX     "Cigritous"
@@ -28,8 +28,8 @@ constexpr uint8_t SENSOR_COUNT = floor( (dht_sensor_count + moist_sensor_count) 
   #define MQTT_USERNAME "cbobzrgp"
   #define MQTT_PASSWORD "CKvOQLxrtuqc"
   #define MQTT_PORT 18789
-  #define WIFI_SSID "Nursamsu Home 2"
-  #define WIFI_PASSWORD "Tabingtrijaya35a"
+  #define WIFI_SSID "MY_WIFI_SSID"
+  #define WIFI_PASSWORD "MY_WIFI_PASSWORD"
   #define SENSOR_THRES 3
   #define TEMP_THRES 35
   #define HUMID_THRES 40
