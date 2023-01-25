@@ -3,7 +3,8 @@
 If you want to flash central module code, use #define with CENTRAL_MODULE 
 If you want to flash node module code, use #define with NODE_MODULE and set the node number
 */
-#define CENTRAL_MODULE 
+// #define CENTRAL_MODULE
+#define NODE_MODULE 
 
 //Please define node number sequentially
 #define NODE_NUMBER 2
@@ -13,21 +14,22 @@ If you want to flash node module code, use #define with NODE_MODULE and set the 
 #define MESH_PORT       5555
 
 
+
 //Don't use pin 12
-constexpr uint8_t DHT_SENSOR_PINS[1] = {25};
-constexpr uint8_t MOIST_SENSOR_PINS[1] = {4};
+constexpr uint8_t DHT_SENSOR_PINS[2] = {25, 26};
+constexpr uint8_t MOIST_SENSOR_PINS[2] = {4, 5};
 
 constexpr uint8_t dht_sensor_count = sizeof(DHT_SENSOR_PINS)/sizeof(DHT_SENSOR_PINS[0]);
 constexpr uint8_t moist_sensor_count = sizeof(MOIST_SENSOR_PINS)/sizeof(MOIST_SENSOR_PINS[0]);
 constexpr uint8_t SENSOR_COUNT = floor( (dht_sensor_count + moist_sensor_count) / 2 );
 
 #if defined(CENTRAL_MODULE)
-  #define WIFI_SSID "WIFI_SSID"
-  #define WIFI_PASSWORD "WIFI_PASSWORD"
   #define MQTT_SERVER "driver.cloudmqtt.com"
   #define MQTT_USERNAME "cbobzrgp"
   #define MQTT_PASSWORD "CKvOQLxrtuqc"
   #define MQTT_PORT 18789
+  #define WIFI_SSID "Nursamsu Home 2"
+  #define WIFI_PASSWORD "Tabingtrijaya35a"
   #define SENSOR_THRES 3
   #define TEMP_THRES 35
   #define HUMID_THRES 40
