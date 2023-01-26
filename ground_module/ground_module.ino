@@ -16,7 +16,6 @@ constexpr float fly_altitude = 2; //relative to home
 //sending to backend
 #include <WiFi.h>
 #include <PubSubClient.h>
-// #include "EspMQTTClient.h"
 
 //mavlink
 #include <mavlink_commands.hpp>
@@ -30,10 +29,6 @@ constexpr float fly_altitude = 2; //relative to home
 
 #define NUM_OF_MISSION 3
 
-WiFiClient wifiClient;
-
-PubSubClient client(wifiClient);
-
 Adafruit_BME680 bme;
 
 MQUnifiedsensor MQ131(BOARD, V_RES, ADC_BIT, MQ131_PIN, "MQ-131");
@@ -42,35 +37,39 @@ Scheduler mainscheduler; // task scheduler
 
 painlessMesh mesh;
 
+WiFiClient wifiClient;
+
+PubSubClient mqttClient(MQTT_SERVER, MQTT_PORT, wifiClient);
+
 std::shared_ptr<Task> send_msg_task;
+std::shared_ptr<Task> mavlink_task;
 
 std::shared_ptr<Mavlink> mavlink;
 
-// EspMQTTClient client(
-//   WIFI_SSID,
-//   WIFI_PASSWORD,
-//   "test.mosquitto.org", // Ip of broker server
-//   "Cigritous",
-//   "Cigritous",
-//   "Central",
-//   1883
-// );
-
 uint8_t i = 0;
-uint8_t id;
+uint8_t total_id, node, sens;
 uint8_t queue[SENSOR_THRES] = {0};
+uint32_t nexttime=0;
+uint8_t  initialized=0;
 bool full;
 // static float home_location[2], sensor_loc[SENSOR_COUNT][2]; //read from backend in init_sensor_location
 
-struct {
-  uint8_t sensor_id;
-  uint8_t node_id;
+struct Node{
+  uint8_t id;
   float humid;
   float moisture;
   float temp;
   float ozone;
   float gas;
-} sensData;
+}sensData[TOTAL_NODE * SENSOR_COUNT];
+
+struct Central{
+  float humid;
+  float temp;
+  float presure;
+  float ozone;
+  float gas;
+}central;
 
 void init_sensor_locations(){
   //read from backend, for now keep static
@@ -78,93 +77,80 @@ void init_sensor_locations(){
 
 void parseMsg(const String& msg) {
   static size_t pos[3];
-  pos[0] = msg.indexOf('/'); //1
-  sensData.sensor_id = msg.substring(0, pos[0]).toInt();
-  pos[1] = msg.indexOf("/", pos[0]+1); //7
-  sensData.humid = msg.substring(pos[0]+1, pos[1]-1).toFloat();
+  pos[0] = msg.indexOf('/');
+  pos[1] = msg.indexOf("/", pos[0]+1);
   pos[2] = msg.indexOf("/", pos[1]+1);
-  sensData.temp = msg.substring(pos[1]+1, pos[2]-1).toFloat();
-  sensData.moisture = msg.substring(pos[2]+1, msg.length()).toFloat();
+  sens = msg.substring(0, pos[0]).toInt();
+  total_id = ((node - 1) - 1) * SENSOR_COUNT + sens;
+  sensData[total_id - 1].id = total_id;
+  sensData[total_id - 1].temp = msg.substring(pos[1]+1, pos[2]-1).toFloat();
+  sensData[total_id - 1].moisture = msg.substring(pos[2]+1, msg.length()).toFloat();
+  sensData[total_id - 1].humid = msg.substring(pos[0]+1, pos[1]-1).toFloat();
+  Serial.println(
+    String(sensData[total_id - 1].id) + " " +
+    String(sensData[total_id - 1].temp) + " " +
+    String(sensData[total_id - 1].moisture) + " " +
+    String(sensData[total_id - 1].humid) + " "
+  );
 }
 
 
 void receivedCallback(uint32_t from, const String& msg ) {
   Serial.printf("RECV: %u msg=%s\n", from, msg.c_str());
   if (msg != "S") { // keep parsing when recieving
+    node = from;
     parseMsg(msg);
-    sensData.node_id = from;
   }
   else mesh.sendSingle(from, "A"); // acknowledge/ACK message
 }
 
 void sendMsgRoutine() {
 
-  // TODO: add BME688 readings
   if(!bme.performReading()){
     Serial.println("BME688 failed to perform reading!");
   }
 
   MQ131.update();
 
-  sensData.ozone = MQ131.readSensorR0Rs();
-
-  id = ((sensData.node_id - 1) - 1) * SENSOR_COUNT + sensData.sensor_id;
+  central.ozone = MQ131.readSensorR0Rs();
 
   // TODO : Set thresholds for certain plants and saves their respective sensor id.
 
   // TODO: send to back-end
 
-  Serial.println(String(bme.temperature) + " " + String(bme.pressure) + " " + String(bme.humidity) + " " + String(bme.gas_resistance));
+  publish_sensor_data();
 
-
-
-  if(sensData.temp > TEMP_THRES && 
-    sensData.humid < HUMID_THRES && 
-    sensData.moisture < MOIST_THRES
-  ){
-    for(i = 0; i < SENSOR_THRES; i++){
-      if(queue[i] == 0){ 
-        queue[i] = id;
-        if(i == SENSOR_THRES - 1) 
-          full = true;
-      }
-    }
-  }
-}
-
-void init_wifi(){
-  delay(10);
-  Serial.print("Connecting to ");
-  Serial.println(WIFI_SSID);
-  while (WiFi.status() != WL_CONNECTED) {
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-    delay(500);
-    Serial.print(".");
-  }
-  randomSeed(micros());
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
+  // if(sensData.temp > TEMP_THRES && 
+  //   sensData.humid < HUMID_THRES && 
+  //   sensData.moisture < MOIST_THRES
+  // ){
+  //   for(i = 0; i < SENSOR_THRES; i++){
+  //     if(queue[i] == 0){ 
+  //       queue[i] = id;
+  //       if(i == SENSOR_THRES - 1) 
+  //         full = true;
+  //     }
+  //   }
+  // }
 }
 
 void reconnect() {
   // Loop until we're reconnected
-  while (!client.connected()) {
+  if (!mqttClient.connected()) { // use if, not while so process not blocking
     Serial.print("Attempting MQTT connection...");
     // Create a random client ID
     String clientId = "ESP32Client-";
     clientId += String(random(0xffff), HEX);
     // Attempt to connect
-    if (client.connect(clientId.c_str(), MQTT_USERNAME, MQTT_PASSWORD)) {
+    if (mqttClient.connect(clientId.c_str(), MQTT_USERNAME, MQTT_PASSWORD)) {
       Serial.println("connected");
       //Once connected, publish an announcement...
-      client.publish("/hello", "Hello from central");
+      mqttClient.publish("/hello", "Hello from central");
       // ... and resubscribe
-      // client.subscribe(MQTT_SERIAL_RECEIVER_CH);
+      // mqttCsubscribe(MQTT_SERIAL_RECEIVER_CH);
     } else {
       Serial.print("failed, rc=");
-      Serial.print(client.state());
+      Serial.print(mqttClient.state());
       Serial.println(" try again in 5 seconds");
       // Wait 5 seconds before retrying
       delay(5000);
@@ -172,14 +158,15 @@ void reconnect() {
   }
 }
 
-// void subscribe_cb(char* topic, byte *payload, unsigned int length) {
-//     Serial.println("-------new message from broker-----");
-//     Serial.print("channel:");
-//     Serial.println(topic);
-//     Serial.print("data:");  
-//     Serial.write(payload, length);
-//     Serial.println();
-// }
+void subscribe_cb(char* topic, byte *payload, unsigned int length) {
+  Serial.println("Subscribe callback");
+    // Serial.println("-------new message from broker-----");
+    // Serial.print("channel:");
+    // Serial.println(topic);
+    // Serial.print("data:");  
+    // Serial.write(payload, length);
+    // Serial.println();
+}
 
 void publish_sensor_data(){
   Serial.println("Publishing sensor data");
@@ -187,70 +174,45 @@ void publish_sensor_data(){
   client.publish("central/press", (String(bme.pressure)).c_str());
   client.publish("central/humid", (String(bme.humidity)).c_str());
   client.publish("central/gas", (String(bme.gas_resistance)).c_str());
-  client.publish("node/temp", (String(id) + "/" + String(sensData.temp)).c_str());
-  client.publish("node/humid", (String(id) + "/" + String(sensData.humid)).c_str());
-  client.publish("node/moist", (String(id) + "/" + String(sensData.moisture)).c_str());
-  // client.publish("central/temp", "32");
-  // client.publish("central/press", "10000");
-  // client.publish("central/humid", "66");
-  // client.publish("central/gas", "123");
-  // client.publish("node/temp", "33");
-  // client.publish("node/humid", "50");
-  // client.publish("node/moist", "33");
+  for(i = 1; i <= TOTAL_NODE * SENSOR_COUNT; i++){
+    mqttClient.publish(("/" + String(i) + "/temp").c_str(), String(sensData[i - 1].temp).c_str());
+    mqttClient.publish(("/" + String(i) + "/humid").c_str(), String(sensData[i - 1].humid).c_str());
+    mqttClient.publish(("/" + String(i) + "/moist").c_str(), String(sensData[i - 1].moisture).c_str());
+  }
 }
 
-// This function is called once everything is connected (Wifi and MQTT)
-// WARNING : YOU MUST IMPLEMENT IT IF YOU USE EspMQTTClient
-// void onConnectionEstablished()
-// {
-//   client.publish("central/temp", String(bme.temperature));
-//   client.publish("central/press", String(bme.pressure));
-//   client.publish("central/humid", String(bme.humidity));
-//   client.publish("central/gas", String(bme.gas_resistance));
-//   client.publish("node/temp", String(id) + "/" + String(sensData.temp));
-//   client.publish("node/humid", String(id) + "/" + String(sensData.humid));
-//   client.publish("node/moist", String(id) + "/" + String(sensData.moisture));
-
-// }
+void recieveMavlink() {
+  mavlink->read_data();
+}
 
 void setup() {
   Serial.begin(115200);
 
   mavlink = std::make_shared<Mavlink>(115200, 16, 17); // Using UART2
   mavlink->req_data_stream();
-  mavlink->read_data();
 
-  
-  // send_msg_task = std::make_shared<Task>(UPDATE_RATE, TASK_FOREVER, sendMsgRoutine);
+  mesh.setDebugMsgTypes( ERROR | STARTUP | CONNECTION);  // set before init() so that you can see startup messages
 
-  // mesh.setDebugMsgTypes( ERROR | STARTUP );  // set before init() so that you can see startup messages
+  mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP_STA, 1, NETWORK_CHANNEL); // Central node number will always be 1
+  mesh.onReceive(&receivedCallback);
+  mesh.stationManual(WIFI_SSID, WIFI_PASSWORD);
+  mesh.setHostname("Cigritous");
 
-  // mesh.init(WIFI_SSID, WIFI_PASSWORD, mainscheduler, MQTT_PORT, WIFI_AP, 1);
+  mesh.setRoot(true);
+  mesh.setContainsRoot(true);
 
-  // // mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP, 1); // Central node number will always be 1
-  // mesh.onReceive(&receivedCallback);
-
-  // mainscheduler.addTask(ConvTask::getFromShared(send_msg_task));
-  // send_msg_task->enable();
-
-  init_wifi();
-  client.setServer(MQTT_SERVER, MQTT_PORT);
-  // client.setCallback(callback);
-  reconnect();
-
-
-  // configTime(0, 0, ntpServer);
+  // mqttClient.setCallback(subscribe_cb);
 
   // Receive heartbeat
   // while(mavlink->get_px_status() != MAV_STATE_STANDBY){
   //   Serial.println("Pixhawk not on standby!");
-  //   mavlink->read_data();
-  //   delay(300);
+  //   delay(1000);
   // }
 
   while(!bme.begin()){
     Serial.println("BME is not connected!");
   }
+
   // Set up oversampling and filter initialization
   bme.setTemperatureOversampling(BME680_OS_8X);
   bme.setHumidityOversampling(BME680_OS_2X);
@@ -279,44 +241,42 @@ void setup() {
 
   if(isinf(calcR0_131)) {Serial.println("Warning: Conection issue on MQ131, R0 is infinite (Open circuit detected) please check your wiring and supply");}
   if(calcR0_131 == 0){Serial.println("Warning: Conection issue found on MQ131, R0 is zero (Analog pin shorts to ground) please check your wiring and supply");}
+  
+  send_msg_task = std::make_shared<Task>(UPDATE_RATE, TASK_FOREVER, sendMsgRoutine);
+  mavlink_task = std::make_shared<Task>(TASK_MILLISECOND, TASK_FOREVER, recieveMavlink);
+
+  mainscheduler.addTask(ConvTask::getFromShared(send_msg_task));
+  mainscheduler.addTask(ConvTask::getFromShared(mavlink_task));
+
+  send_msg_task->enable();
+  mavlink_task->enable();
 
 }
 
 void loop() {
   // it will run the user scheduler as well
-  // mesh.update();
+  mesh.update();
+  mqttClient.loop();
+  reconnect();
 
-  if (!client.connected()) {
-    reconnect();
-  }
-
-  client.loop();
-
-  bme.performReading();
-
-  publish_sensor_data();
-  delay(1000);
-
-  if(full){ // check if queue is full
-    mavlink->send_mission_count(SENSOR_THRES);
-    for(i = 0; i < SENSOR_THRES; i++){
-      while(mavlink->get_mis_req_status()){
-        mavlink->read_data(); // Wait for a request
-      }
-      mavlink->send_mission_item(SENSOR_LOC[queue[i] - 1][0], SENSOR_LOC[queue[i] - 1][1], fly_altitude);
-    }
-    delay(100);
+  // if(full){ // check if queue is full
+  //   mavlink->send_mission_count(SENSOR_THRES);
+  //   for(i = 0; i < SENSOR_THRES; i++){
+  //     while(mavlink->get_mis_req_status()); //wait for a request
+  //     mavlink->send_mission_item(SENSOR_LOC[queue[i] - 1][0], SENSOR_LOC[queue[i] - 1][1], fly_altitude);
+  //   }
+  //   delay(100);
     
-    mavlink->takeoff(fly_altitude);
+  //   mavlink->takeoff(fly_altitude);
 
-    mavlink->start_mission();
+  //   mavlink->start_mission();
 
-    mavlink->land();
+  //   mavlink->land();
 
-    for(i = 0; i < SENSOR_THRES; i++){
-      queue[i] = 0;
-    }
-  }
+  //   for(i = 0; i < SENSOR_THRES; i++){
+  //     queue[i] = 0;
+  //   }
+  // }
 }
 
 // === END OF CENTRAL MODULE SOURCE CODE SECTION ===
@@ -358,7 +318,7 @@ void readSensorRoutine() {
   for (i = 0; i < SENSOR_COUNT; i++) {
     humid[i] = dht[i]->getHumidity();
     temp[i] = dht[i]->getTemperature();  
-    moisture[i] = 32;  //yl3869[i].read();
+    moisture[i] = 32; // yl3869[i]->read();
   }
 
   Serial.println("Sensor data read");
@@ -427,9 +387,10 @@ void setup() {
 
   send_msg_task = std::make_shared<Task>(TASK_MILLISECOND, TASK_ONCE, readSensorRoutine);
   
-  mesh.init(WIFI_SSID, WIFI_PASSWORD, mainscheduler, MQTT_PORT, WIFI_AP_STA, NODE_NUMBER);  // node number can be changed from settings.h
+  mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP_STA, NODE_NUMBER, NETWORK_CHANNEL);  // node number can be changed from settings.h
   mesh.onReceive(&receivedCallback);
   mesh.onNewConnection(newConnectionCallback);
+  mesh.setContainsRoot(true);
 
   mainscheduler.addTask(ConvTask::getFromShared(send_msg_task));
   send_msg_task->enable();

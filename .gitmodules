@@ -6,7 +6,7 @@
 	url = https://github.com/rotary-auav-ui/painlessMesh.git
 [submodule "libraries/MQUnifiedsensor"]
 	path = libraries/MQUnifiedsensor
-	url = https://github.com/miguel5612/MQSensorsLib
+	url = https://github.com/miguel5612/MQSensorsLib.git
 [submodule "libraries/DHTesp"]
 	path = libraries/DHTesp
 	url = https://github.com/rotary-auav-ui/DHTesp.git
@@ -37,9 +37,6 @@
 [submodule "libraries/mavlink-c-library"]
 	path = libraries/mavlink-c-library
 	url = https://github.com/rotary-auav-ui/mavlink-c-library.git
-[submodule "libraries/EspMQTTClient"]
-	path = libraries/EspMQTTClient
-	url = https://github.com/plapointe6/EspMQTTClient.git
 [submodule "libraries/pubsubclient"]
 	path = libraries/pubsubclient
 	url = https://github.com/knolleary/pubsubclient.git
