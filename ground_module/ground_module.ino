@@ -39,7 +39,7 @@ painlessMesh mesh;
 
 WiFiClient wifiClient;
 
-PubSubClient mqttClient;
+PubSubClient mqttClient(MQTT_SERVER, MQTT_PORT, wifiClient);
 
 std::shared_ptr<Task> send_msg_task;
 std::shared_ptr<Task> mavlink_task;
@@ -134,25 +134,9 @@ void sendMsgRoutine() {
   // }
 }
 
-void init_wifi(){
-  delay(10);
-  Serial.print("Connecting to ");
-  Serial.println(WIFI_SSID);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  randomSeed(micros());
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
-}
-
 void reconnect() {
   // Loop until we're reconnected
-  while (!mqttClient.connected()) {
+  if (!mqttClient.connected()) { // use if, not while so process not blocking
     Serial.print("Attempting MQTT connection...");
     // Create a random client ID
     String clientId = "ESP32Client-";
@@ -211,27 +195,17 @@ void setup() {
   mavlink = std::make_shared<Mavlink>(115200, 16, 17); // Using UART2
   mavlink->req_data_stream();
 
-  send_msg_task = std::make_shared<Task>(UPDATE_RATE, TASK_FOREVER, sendMsgRoutine);
-  mavlink_task = std::make_shared<Task>(TASK_MILLISECOND, TASK_FOREVER, recieveMavlink);
-
   mesh.setDebugMsgTypes( ERROR | STARTUP);  // set before init() so that you can see startup messages
 
   mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP_STA, 1); // Central node number will always be 1
   mesh.onReceive(&receivedCallback);
   mesh.stationManual(WIFI_SSID, WIFI_PASSWORD);
   mesh.setHostname("Cigritous");
+
   mesh.setRoot(true);
   mesh.setContainsRoot(true);
 
-  mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
   // mqttClient.setCallback(subscribe_cb);
-  mqttClient.setClient(wifiClient);
-
-  mainscheduler.addTask(ConvTask::getFromShared(send_msg_task));
-  mainscheduler.addTask(ConvTask::getFromShared(mavlink_task));
-
-  send_msg_task->enable();
-  mavlink_task->enable();
 
   // Receive heartbeat
   // while(mavlink->get_px_status() != MAV_STATE_STANDBY){
@@ -271,6 +245,15 @@ void setup() {
 
   if(isinf(calcR0_131)) {Serial.println("Warning: Conection issue on MQ131, R0 is infinite (Open circuit detected) please check your wiring and supply");}
   if(calcR0_131 == 0){Serial.println("Warning: Conection issue found on MQ131, R0 is zero (Analog pin shorts to ground) please check your wiring and supply");}
+  
+  send_msg_task = std::make_shared<Task>(UPDATE_RATE, TASK_FOREVER, sendMsgRoutine);
+  mavlink_task = std::make_shared<Task>(TASK_MILLISECOND, TASK_FOREVER, recieveMavlink);
+
+  mainscheduler.addTask(ConvTask::getFromShared(send_msg_task));
+  mainscheduler.addTask(ConvTask::getFromShared(mavlink_task));
+
+  send_msg_task->enable();
+  mavlink_task->enable();
 
 }
 
