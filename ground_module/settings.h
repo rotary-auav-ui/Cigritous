@@ -12,8 +12,7 @@ If you want to flash node module code, use #define with NODE_MODULE and set the 
 #define MESH_PREFIX     "Cigritous"
 #define MESH_PASSWORD   "Cigritous"
 #define MESH_PORT       5555
-
-
+#define NETWORK_CHANNEL 6
 
 //Don't use pin 12
 constexpr uint8_t DHT_SENSOR_PINS[2] = {25, 26};
@@ -24,18 +23,18 @@ constexpr uint8_t moist_sensor_count = sizeof(MOIST_SENSOR_PINS)/sizeof(MOIST_SE
 constexpr uint8_t SENSOR_COUNT = floor( (dht_sensor_count + moist_sensor_count) / 2 );
 
 #if defined(CENTRAL_MODULE)
-  #define MQTT_SERVER "driver.cloudmqtt.com"
+  #define MQTT_SERVER   "driver.cloudmqtt.com"
   #define MQTT_USERNAME "cbobzrgp"
   #define MQTT_PASSWORD "CKvOQLxrtuqc"
-  #define MQTT_PORT 18789
-  #define WIFI_SSID "MY_WIFI_SSID"
+  #define MQTT_PORT     18789
+  #define WIFI_SSID     "MY_WIFI_SSID"
   #define WIFI_PASSWORD "MY_WIFI_PASSWORD"
-  #define SENSOR_THRES 3
-  #define TEMP_THRES 35
-  #define HUMID_THRES 40
-  #define MOIST_THRES 40
-  #define TOTAL_NODE 1
-  #define MQ131_PIN 5
+  #define SENSOR_THRES  3 
+  #define TEMP_THRES    35
+  #define HUMID_THRES   40
+  #define MOIST_THRES   40
+  #define TOTAL_NODE    1
+  #define MQ131_PIN     5
   constexpr uint64_t UPDATE_RATE = 5 * TASK_SECOND;
 #else
   constexpr uint64_t REPEAT_SEND_RATE = 2 * TASK_SECOND;

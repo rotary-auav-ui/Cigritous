@@ -106,9 +106,9 @@ void receivedCallback(uint32_t from, const String& msg ) {
 
 void sendMsgRoutine() {
 
-  // if(!bme.performReading()){
-  //   Serial.println("BME688 failed to perform reading!");
-  // }
+  if(!bme.performReading()){
+    Serial.println("BME688 failed to perform reading!");
+  }
 
   MQ131.update();
 
@@ -169,15 +169,11 @@ void subscribe_cb(char* topic, byte *payload, unsigned int length) {
 }
 
 void publish_sensor_data(){
-  // client.publish("central/temp", (String(bme.temperature)).c_str());
-  // client.publish("central/press", (String(bme.pressure)).c_str());
-  // client.publish("central/humid", (String(bme.humidity)).c_str());
-  // client.publish("central/gas", (String(bme.gas_resistance)).c_str());
   Serial.println("Publishing sensor data");
-  mqttClient.publish("/central/temp", "32");
-  mqttClient.publish("/central/press", "12000");
-  mqttClient.publish("/central/humid", "67");
-  mqttClient.publish("/central/gas", "11000");
+  client.publish("central/temp", (String(bme.temperature)).c_str());
+  client.publish("central/press", (String(bme.pressure)).c_str());
+  client.publish("central/humid", (String(bme.humidity)).c_str());
+  client.publish("central/gas", (String(bme.gas_resistance)).c_str());
   for(i = 1; i <= TOTAL_NODE * SENSOR_COUNT; i++){
     mqttClient.publish(("/" + String(i) + "/temp").c_str(), String(sensData[i - 1].temp).c_str());
     mqttClient.publish(("/" + String(i) + "/humid").c_str(), String(sensData[i - 1].humid).c_str());
@@ -197,7 +193,7 @@ void setup() {
 
   mesh.setDebugMsgTypes( ERROR | STARTUP | CONNECTION);  // set before init() so that you can see startup messages
 
-  mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP_STA, 1, 6); // Central node number will always be 1
+  mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP_STA, 1, NETWORK_CHANNEL); // Central node number will always be 1
   mesh.onReceive(&receivedCallback);
   mesh.stationManual(WIFI_SSID, WIFI_PASSWORD);
   mesh.setHostname("Cigritous");
@@ -213,16 +209,16 @@ void setup() {
   //   delay(1000);
   // }
 
-  // while(!bme.begin()){
-  //   Serial.println("BME is not connected!");
-  // }
+  while(!bme.begin()){
+    Serial.println("BME is not connected!");
+  }
 
-  // // Set up oversampling and filter initialization
-  // bme.setTemperatureOversampling(BME680_OS_8X);
-  // bme.setHumidityOversampling(BME680_OS_2X);
-  // bme.setPressureOversampling(BME680_OS_4X);
-  // bme.setIIRFilterSize(BME680_FILTER_SIZE_3);
-  // bme.setGasHeater(320, 150); // 320*C for 150 ms
+  // Set up oversampling and filter initialization
+  bme.setTemperatureOversampling(BME680_OS_8X);
+  bme.setHumidityOversampling(BME680_OS_2X);
+  bme.setPressureOversampling(BME680_OS_4X);
+  bme.setIIRFilterSize(BME680_FILTER_SIZE_3);
+  bme.setGasHeater(320, 150); // 320*C for 150 ms
 
   MQ131.setRegressionMethod(1);
   MQ131.setA(23.943);
@@ -391,7 +387,7 @@ void setup() {
 
   send_msg_task = std::make_shared<Task>(TASK_MILLISECOND, TASK_ONCE, readSensorRoutine);
   
-  mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP_STA, NODE_NUMBER, 6);  // node number can be changed from settings.h
+  mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP_STA, NODE_NUMBER, NETWORK_CHANNEL);  // node number can be changed from settings.h
   mesh.onReceive(&receivedCallback);
   mesh.onNewConnection(newConnectionCallback);
   mesh.setContainsRoot(true);
