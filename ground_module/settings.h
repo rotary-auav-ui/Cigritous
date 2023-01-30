@@ -4,7 +4,7 @@ If you want to flash central module code, use #define with CENTRAL_MODULE
 If you want to flash node module code, use #define with NODE_MODULE and set the node number
 */
 #define CENTRAL_MODULE
-// #define NODE_MODULE 
+// #define NODE_MODULE
 
 // Please define node number sequentially
 #define NODE_NUMBER 2
@@ -27,13 +27,13 @@ constexpr uint8_t SENSOR_COUNT = floor( (dht_sensor_count + moist_sensor_count) 
   #define MQTT_USERNAME "cbobzrgp"
   #define MQTT_PASSWORD "CKvOQLxrtuqc"
   #define MQTT_PORT     18789
-  #define WIFI_SSID     "MY_WIFI_SSID"
-  #define WIFI_PASSWORD "MY_WIFI_PASSWORD"
+  #define WIFI_SSID     "JuanJonathan"
+  #define WIFI_PASSWORD "123juan123;'"
   #define SENSOR_THRES  3 
   #define TEMP_THRES    35
   #define HUMID_THRES   40
   #define MOIST_THRES   40
-  #define TOTAL_NODE    1
+  #define TOTAL_NODE    3
   #define MQ131_PIN     5
   constexpr uint64_t UPDATE_RATE = 5 * TASK_SECOND;
 #else

@@ -4,8 +4,8 @@
 // === CENTRAL MODULE SECTION SOURCE CODE ===
 
 //latitude and longitude of home and sensor. Change to static float when able to read from backend
-constexpr float HOME_LOC[2] = {6.124125, -6.12412512};
-constexpr float SENSOR_LOC[TOTAL_NODE * SENSOR_COUNT][2] = {{6.1523124, -6.412512}}; 
+// constexpr float HOME_LOC[2] = {6.124125, -6.12412512};
+// constexpr float SENSOR_LOC[TOTAL_NODE * SENSOR_COUNT][2] = {{6.1523124, -6.412512}}; 
 constexpr float fly_altitude = 2; //relative to home
 
 //sensors
@@ -13,7 +13,7 @@ constexpr float fly_altitude = 2; //relative to home
 #include <Adafruit_Sensor.h>
 #include "Adafruit_BME680.h"
 
-//sending to backend
+//sending to backend and receive from backend
 #include <WiFi.h>
 #include <PubSubClient.h>
 
@@ -52,7 +52,7 @@ uint8_t queue[SENSOR_THRES] = {0};
 uint32_t nexttime=0;
 uint8_t  initialized=0;
 bool full;
-// static float home_location[2], sensor_loc[SENSOR_COUNT][2]; //read from backend in init_sensor_location
+float home_location[2], sensor_loc[TOTAL_NODE * SENSOR_COUNT][2]; //read from backend in subscribe_cb
 
 struct Node{
   uint8_t id;
@@ -70,10 +70,6 @@ struct Central{
   float ozone;
   float gas;
 }central;
-
-void init_sensor_locations(){
-  //read from backend, for now keep static
-}
 
 void parseMsg(const String& msg) {
   static size_t pos[3];
@@ -134,7 +130,7 @@ void sendMsgRoutine() {
   // }
 }
 
-void reconnect() {
+bool reconnect() {
   // Loop until we're reconnected
   if (!mqttClient.connected()) { // use if, not while so process not blocking
     Serial.print("Attempting MQTT connection...");
@@ -144,40 +140,59 @@ void reconnect() {
     // Attempt to connect
     if (mqttClient.connect(clientId.c_str(), MQTT_USERNAME, MQTT_PASSWORD)) {
       Serial.println("connected");
-      //Once connected, publish an announcement...
       mqttClient.publish("/hello", "Hello from central");
-      // ... and resubscribe
-      // mqttCsubscribe(MQTT_SERIAL_RECEIVER_CH);
+      return true;
     } else {
       Serial.print("failed, rc=");
       Serial.print(mqttClient.state());
       Serial.println(" try again in 5 seconds");
-      // Wait 5 seconds before retrying
-      delay(5000);
+      return false;
     }
   }
+  return true;
 }
 
 void subscribe_cb(char* topic, byte *payload, unsigned int length) {
-  Serial.println("Subscribe callback");
-    // Serial.println("-------new message from broker-----");
-    // Serial.print("channel:");
-    // Serial.println(topic);
-    // Serial.print("data:");  
-    // Serial.write(payload, length);
-    // Serial.println();
+  Serial.println("GPS settings detected");
+  static uint8_t parser, key;
+  static float coor;
+  char* message = (char*)malloc(length + 1);
+  memcpy(message, payload, length);
+  message[length] = '\0';
+  String tpc = String(topic);
+  String msg = String(message);
+  free(message);
+  Serial.println(msg + " " + tpc);
+  parser = tpc.indexOf('/');
+  key = tpc.substring(0, parser).toInt();
+  String val = String(tpc.substring(parser + 1, tpc.length()));
+  coor = msg.toFloat();
+  if(val.equals("lat")){
+    sensor_loc[key - 1][0] = coor;
+    Serial.printf("Sensor %u latitude set to %f\n", key - 1, coor);
+  }else if(val.equals("lng")){
+    sensor_loc[key - 1][1] = coor;
+    Serial.printf("Sensor %u longitude set to %f\n", key - 1, coor);
+  }else{
+    Serial.println("GPS setting invalid");
+  }
 }
 
 void publish_sensor_data(){
-  Serial.println("Publishing sensor data");
-  client.publish("central/temp", (String(bme.temperature)).c_str());
-  client.publish("central/press", (String(bme.pressure)).c_str());
-  client.publish("central/humid", (String(bme.humidity)).c_str());
-  client.publish("central/gas", (String(bme.gas_resistance)).c_str());
-  for(i = 1; i <= TOTAL_NODE * SENSOR_COUNT; i++){
-    mqttClient.publish(("/" + String(i) + "/temp").c_str(), String(sensData[i - 1].temp).c_str());
-    mqttClient.publish(("/" + String(i) + "/humid").c_str(), String(sensData[i - 1].humid).c_str());
-    mqttClient.publish(("/" + String(i) + "/moist").c_str(), String(sensData[i - 1].moisture).c_str());
+  if(reconnect()){
+    Serial.println("Publishing sensor data");
+    mqttClient.publish("/central/temp", (String(bme.temperature)).c_str());
+    mqttClient.publish("/central/press", (String(bme.pressure)).c_str());
+    mqttClient.publish("/central/humid", (String(bme.humidity)).c_str());
+    mqttClient.publish("/central/gas", (String(bme.gas_resistance)).c_str());
+    for(i = 1; i <= TOTAL_NODE * SENSOR_COUNT; i++){
+      // mqttClient.publish(("/" + String(i) + "/temp").c_str(), String(sensData[i - 1].temp).c_str());
+      // mqttClient.publish(("/" + String(i) + "/humid").c_str(), String(sensData[i - 1].humid).c_str());
+      // mqttClient.publish(("/" + String(i) + "/moist").c_str(), String(sensData[i - 1].moisture).c_str());
+      mqttClient.publish(("/" + String(i) + "/temp").c_str(), String(40 + i).c_str());
+      mqttClient.publish(("/" + String(i) + "/humid").c_str(), String(70 + 2 * i).c_str());
+      mqttClient.publish(("/" + String(i) + "/moist").c_str(), String(40 + 3 * i).c_str());
+    }
   }
 }
 
@@ -191,6 +206,8 @@ void setup() {
   mavlink = std::make_shared<Mavlink>(115200, 16, 17); // Using UART2
   mavlink->req_data_stream();
 
+  mqttClient.setCallback(&subscribe_cb);
+
   mesh.setDebugMsgTypes( ERROR | STARTUP | CONNECTION);  // set before init() so that you can see startup messages
 
   mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP_STA, 1, NETWORK_CHANNEL); // Central node number will always be 1
@@ -201,8 +218,6 @@ void setup() {
   mesh.setRoot(true);
   mesh.setContainsRoot(true);
 
-  // mqttClient.setCallback(subscribe_cb);
-
   // Receive heartbeat
   // while(mavlink->get_px_status() != MAV_STATE_STANDBY){
   //   Serial.println("Pixhawk not on standby!");
@@ -211,6 +226,7 @@ void setup() {
 
   while(!bme.begin()){
     Serial.println("BME is not connected!");
+    delay(1000);
   }
 
   // Set up oversampling and filter initialization
@@ -257,7 +273,6 @@ void loop() {
   // it will run the user scheduler as well
   mesh.update();
   mqttClient.loop();
-  reconnect();
 
   // if(full){ // check if queue is full
   //   mavlink->send_mission_count(SENSOR_THRES);
