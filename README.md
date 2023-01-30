@@ -8,7 +8,33 @@ Cigritous is a NXP Hovergames project by Vishwakarma AUAV UI for reducing yield 
 
 ## Branch Information
 
+### Onboard /  Branch
+
+*`main`*
+
+Branch for drone computer programs. Contains drone visual-inertial-api, pest detector, and precision lander
+
+Hardware:
+
+- NXP Vehicle Drone Kit (RDDRONE-FMUK66)
+- NXP i.MX 8M Plus based 8M NavQ Plus Computer
+
+Software:
+
+- Linux Ubuntu 22.04 LTS Jammy Jellyfish
+- ROS2 Humble Hawksbill
+- PX4-Autopilot v1.13
+
+
 ### Ground Branch
+
+*`ground-module`*
+
+Branch for ground module programs. Contains `node-module` and `central-module` source codes and libraries.
+
+The central module recieves sensors data from `node-module` using mesh network, and commanding drone to to agriculture tasks.
+
+The node module connects with each other using mesh network and relaying sensor data to `central-module`.
 
 Hardware:
 
@@ -16,7 +42,6 @@ Hardware:
 - ESP32 DevKit
 - MQ131 Ozone Sensor
 - YL-38/69 Moisture Sensor
-- SIM900A GSM Module
 - DHT22 Humidity and Temperature Sensor
 
 Software:
@@ -28,29 +53,5 @@ Software:
   - DHTesp
   - YL3869
   - MQUnifiedsensors
+  - MQTT library
   - Bosch BME68x library
-
-#### `ground-module`
-
-Branch for ground module programs. Contains `node-module` and `central-module` source codes and libraries.
-
-The central module recieves sensors data from `node-module` using mesh network, and commanding drone to to agriculture tasks.
-
-The node module connects with each other using mesh network and relaying sensor data to `central-module`.
-
-### Drone Branch
-
-Hardware:
-
-- NXP Vehicle Drone Kit (RDDRONE-FMUK66)
-- NXP i.MX 8M Plus based 8M NavQ Plus Computer
-
-Software:
-
-- Linux Ubuntu 20.04 Focal Fossa
-- ROS2 Foxy Fitzroy
-- PX4-Autopilot v1.12.3
-
-#### `main`
-
-Repository for drone computer. Contains drone 'summon' system, waypoint code, and machine learning algorithm to track crows as pest
