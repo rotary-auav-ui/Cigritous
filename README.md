@@ -1,6 +1,6 @@
 # Welcome to Cigritous Repository!
 
-!['cigritous logo'](https://github.com/rotary-auav-ui/cigritous/blob/main/docs/project_logo.png)  
+!['cigritous logo'](https://github.com/rotary-auav-ui/cigritous/blob/main/docs/project_logo.png | height=500)  
 
 Cigritous is a NXP Hovergames project by Vishwakarma Research Group Universitas Indonesia for reducing yield losses from pests and weather. For our initial design, please read: https://www.hackster.io/contests/nxp-hovergames-challenge-3/hardware_applications/15385
 
@@ -25,7 +25,7 @@ Cigritous is a NXP Hovergames project by Vishwakarma Research Group Universitas 
 
 ## Branch Information
 
-### Onboard /  Branch
+### Onboard Module Branch
 
 *`main`*
 
@@ -38,12 +38,38 @@ Hardware:
 
 Software:
 
-- Linux Ubuntu 22.04 LTS Jammy Jellyfish
-- ROS2 Humble Hawksbill
+- Linux Ubuntu 22.04 LTS Jammy Jellyfish / 20.04 LTS Focal Fossa
+- ROS2 Humble Hawksbill / Foxy Fitzroy
 - PX4-Autopilot v1.13
 
+# Installation Tutorial
+Create ROS2 workspace
 
-### Ground Branch
+`mkdir cigritous_ws && cd cigritous_ws`
+
+Clone the package
+
+`git clone --recurse-submodules -b main https://github.com/rotary-auav-ui/cigritous.git`
+
+Rename to src
+
+`mv cigritous src`
+
+Build the package
+
+`colcon build`
+
+If submodule clone fails,
+
+`cd src`
+
+`git submodule update --init`
+
+`cd ..`
+
+Then continue to build the package
+
+### Ground Module Branch
 
 *`ground-module`*
 
@@ -72,3 +98,12 @@ Software:
   - MQUnifiedsensors
   - MQTT library
   - Bosch BME68x library
+
+# Installation Tutorial
+`git clone -b ground-module https://github.com/rotary-auav-ui/cigritous.git`
+
+Copy all the folder in `libraries` to `Documents/Arduino/libraries`
+
+Configure the sensors, program, and connections in `setting.h`
+
+Flash to microcontroller
