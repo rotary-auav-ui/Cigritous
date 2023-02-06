@@ -3,21 +3,18 @@
 #if defined(CENTRAL_MODULE)
 // === CENTRAL MODULE SECTION SOURCE CODE ===
 
-//latitude and longitude of home and sensor. Change to static float when able to read from backend
-// constexpr float HOME_LOC[2] = {6.124125, -6.12412512};
-// constexpr float SENSOR_LOC[TOTAL_NODE * SENSOR_COUNT][2] = {{6.1523124, -6.412512}}; 
 constexpr float fly_altitude = 2; //relative to home
 
-//sensors
+// Sensors
 #include "MQUnifiedsensor.h"
 #include <Adafruit_Sensor.h>
 #include "Adafruit_BME680.h"
 
-//sending to backend and receive from backend
+// Sending to backend and receive from backend
 #include <WiFi.h>
 #include <PubSubClient.h>
 
-//mavlink
+// MAVLink
 #include <mavlink_commands.hpp>
 #include <memory>
 
@@ -44,7 +41,7 @@ PubSubClient mqttClient(MQTT_SERVER, MQTT_PORT, wifiClient);
 std::shared_ptr<Task> send_msg_task;
 std::shared_ptr<Task> mavlink_task;
 
-std::shared_ptr<Mavlink> mavlink;
+std::shared_ptr<MAVLink> mavlink;
 
 uint8_t i = 0;
 uint8_t total_id, node, sens;
@@ -110,11 +107,9 @@ void sendMsgRoutine() {
 
   central.ozone = MQ131.readSensorR0Rs();
 
-  // TODO : Set thresholds for certain plants and saves their respective sensor id.
-
-  // TODO: send to back-end
-
   publish_sensor_data();
+
+  // TODO : Checking if certain plants need to be watered and add them to queue
 
   // if(sensData.temp > TEMP_THRES && 
   //   sensData.humid < HUMID_THRES && 
@@ -167,10 +162,10 @@ void subscribe_cb(char* topic, byte *payload, unsigned int length) {
   key = tpc.substring(0, parser).toInt();
   String val = String(tpc.substring(parser + 1, tpc.length()));
   coor = msg.toFloat();
-  if(val.equals("lat")){
+  if(val.equals("latitude")){
     sensor_loc[key - 1][0] = coor;
     Serial.printf("Sensor %u latitude set to %f\n", key - 1, coor);
-  }else if(val.equals("lng")){
+  }else if(val.equals("longitude")){
     sensor_loc[key - 1][1] = coor;
     Serial.printf("Sensor %u longitude set to %f\n", key - 1, coor);
   }else{
@@ -203,7 +198,7 @@ void recieveMavlink() {
 void setup() {
   Serial.begin(115200);
 
-  mavlink = std::make_shared<Mavlink>(115200, 16, 17); // Using UART2
+  mavlink = std::make_shared<MAVLink>(115200, 16, 17); // Using UART2
   mavlink->req_data_stream();
 
   mqttClient.setCallback(&subscribe_cb);
@@ -274,24 +269,16 @@ void loop() {
   mesh.update();
   mqttClient.loop();
 
-  // if(full){ // check if queue is full
-  //   mavlink->send_mission_count(SENSOR_THRES);
-  //   for(i = 0; i < SENSOR_THRES; i++){
-  //     while(mavlink->get_mis_req_status()); //wait for a request
-  //     mavlink->send_mission_item(SENSOR_LOC[queue[i] - 1][0], SENSOR_LOC[queue[i] - 1][1], fly_altitude);
-  //   }
-  //   delay(100);
-    
-  //   mavlink->takeoff(fly_altitude);
+  if(full){ // check if queue is full
+    for(i = 0; i < SENSOR_THRES; i++){
+        mavlink->waypoints.push_back(std::make_tuple(sensor_loc[queue[i] - 1][0], sensor_loc[queue[i] - 1][1], fly_altitude));
+    }
+    mavlink->send_mission_count(SENSOR_THRES);
 
-  //   mavlink->start_mission();
-
-  //   mavlink->land();
-
-  //   for(i = 0; i < SENSOR_THRES; i++){
-  //     queue[i] = 0;
-  //   }
-  // }
+    for(i = 0; i < SENSOR_THRES; i++){
+      queue[i] = 0;
+    }
+  }
 }
 
 // === END OF CENTRAL MODULE SOURCE CODE SECTION ===
