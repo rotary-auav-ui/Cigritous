@@ -107,7 +107,7 @@ void sendMsgRoutine() {
 
   central.ozone = MQ131.readSensorR0Rs();
 
-  publish_sensor_data();
+  publish_data();
 
   // TODO : Checking if certain plants need to be watered and add them to queue
 
@@ -173,9 +173,28 @@ void subscribe_cb(char* topic, byte *payload, unsigned int length) {
   }
 }
 
-void publish_sensor_data(){
+void publish_data(){
   if(reconnect()){
-    Serial.println("Publishing sensor data");
+    Serial.println("Publishing data");
+
+    // Drone data
+    static std::array<float, 3> temp;
+    temp = mavlink->get_global_pos_curr();
+    mqttClient.publish("/drone/lat", (String(temp[0])).c_str());
+    mqttClient.publish("/drone/lng", (String(temp[1])).c_str());
+    mqttClient.publish("/drone/alt", (String(temp[2])).c_str());
+    temp = mavlink->get_velocity_curr();
+    mqttClient.publish("/drone/vx", (String(temp[0])).c_str());
+    mqttClient.publish("/drone/vy", (String(temp[1])).c_str());
+    mqttClient.publish("/drone/vz", (String(temp[2])).c_str());
+    static float time_boot;
+    time_boot = mavlink->get_time_boot();
+    mqttClient.publish("/drone/time", (String(time_boot)).c_str());
+    static uint16_t yaw_curr;
+    yaw_curr = mavlink->get_yaw_curr();
+    mqttClient.publish("/drone/time", (String(yaw_curr)).c_str());
+
+    // Sensor data
     mqttClient.publish("/central/temp", (String(bme.temperature)).c_str());
     mqttClient.publish("/central/press", (String(bme.pressure)).c_str());
     mqttClient.publish("/central/humid", (String(bme.humidity)).c_str());
