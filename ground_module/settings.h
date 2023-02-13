@@ -15,7 +15,7 @@ If you want to flash node module code, use #define with NODE_MODULE and set the 
 #define NETWORK_CHANNEL 6
 
 //Don't use pin 12
-constexpr uint8_t DHT_SENSOR_PINS[2] = {25, 26};
+constexpr uint8_t DHT_SENSOR_PINS[2] = {25};
 constexpr uint8_t MOIST_SENSOR_PINS[2] = {4, 5};
 
 constexpr uint8_t dht_sensor_count = sizeof(DHT_SENSOR_PINS)/sizeof(DHT_SENSOR_PINS[0]);
@@ -27,8 +27,8 @@ constexpr uint8_t SENSOR_COUNT = floor( (dht_sensor_count + moist_sensor_count) 
   #define MQTT_USERNAME "cbobzrgp"
   #define MQTT_PASSWORD "CKvOQLxrtuqc"
   #define MQTT_PORT     18789
-  #define WIFI_SSID     "MY_WIFI_SSID"
-  #define WIFI_PASSWORD "MY_WIFI_PASSWORD"
+  #define WIFI_SSID     "JuanJonathan"
+  #define WIFI_PASSWORD "123juan123;'"
   #define SENSOR_THRES  3 
   #define TEMP_THRES    35
   #define HUMID_THRES   40
