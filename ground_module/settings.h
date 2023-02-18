@@ -15,7 +15,7 @@ If you want to flash node module code, use #define with NODE_MODULE and set the 
 #define NETWORK_CHANNEL 6
 
 //Don't use pin 12
-constexpr uint8_t DHT_SENSOR_PINS[2] = {25};
+constexpr uint8_t DHT_SENSOR_PINS[1] = {25};
 constexpr uint8_t MOIST_SENSOR_PINS[2] = {4, 5};
 
 constexpr uint8_t dht_sensor_count = sizeof(DHT_SENSOR_PINS)/sizeof(DHT_SENSOR_PINS[0]);

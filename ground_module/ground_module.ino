@@ -225,9 +225,9 @@ void setup() {
   //   delay(1000);
   // }
 
-  while(!bme.begin()){
-    Serial.println("BME is not connected!");
-  }
+  // while(!bme.begin()){
+  //   Serial.println("BME is not connected!");
+  // }
 
   // Set up oversampling and filter initialization
   bme.setTemperatureOversampling(BME680_OS_8X);
@@ -336,6 +336,7 @@ void readSensorRoutine() {
     humid[i] = dht[i]->getHumidity();
     temp[i] = dht[i]->getTemperature();  
     moisture[i] = 32; // yl3869[i]->read();
+    Serial.printf("humid %f\n temperature %f", humid[i], temp[i]);
   }
 
   Serial.println("Sensor data read");
