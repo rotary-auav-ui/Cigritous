@@ -2,9 +2,9 @@
 
 !['cigritous logo'](https://github.com/rotary-auav-ui/cigritous/blob/main/docs/project_logo.png)  
 
-Cigritous is a NXP Hovergames project by Vishwakarma Aerial Dexterity Research Group Universitas Indonesia for reducing yield losses from pests and weather. 
+Cigritous is a NXP Hovergames 3 project by **Vishwakarma Aerial Dexterity Research Group Universitas Indonesia** for reducing yield losses from pests and weather. 
 
-For detailed concept, please read: [Cigritous NXP Hovergames 3](https://www.hackster.io/contests/nxp-hovergames-challenge-3/hardware_applications/15385)
+For detailed concept, please read: [Crop Monitoring with Automated UAV Spray Response](https://www.hackster.io/contests/nxp-hovergames-challenge-3/hardware_applications/15385)
 
 ## Authors
 - Thariq Hadyan (EE 23)
@@ -23,15 +23,15 @@ For detailed concept, please read: [Cigritous NXP Hovergames 3](https://www.hack
 - M. Daffa Aryasetya (EE 25)
 - M. Fikri R. Abyadhi (EE 25)
 
-# Caution: Work In Progress
+***Caution: Work In Progress***
 
 ## Branch Information
 
-### Onboard Module Branch
+### Onboard Program Branch
 
 *`main`*
 
-Branch for drone computer programs. Contains drone visual-inertial-api, pest detector, and precision lander
+Branch for drone computer programs. Contains drone *visual-inertial program*, *pest detector*, and *precision landing*
 
 Hardware:
 
@@ -47,15 +47,13 @@ Software:
 #### Installation
 [Drone Onboard Program Install](https://github.com/rotary-auav-ui/cigritous/blob/main/INSTALL.md)  
 
-### Ground Module Branch
+### Sensor Network / Ground Module Branch
 
 *`ground-module`*
 
-Branch for ground module programs. Contains `node-module` and `central-module` source codes and libraries.
+Branch for sensor network or ground module programs. Contains *sensor nodes* source codes and libraries.
 
-The central module recieves sensors data from `node-module` using mesh network, and commanding drone to to agriculture tasks.
-
-The node module connects with each other using mesh network and relaying sensor data to `central-module`.
+The sensor network has 2 main part: **central** and **node**. The nodes are connected together by mesh and connected to sensors to sample ground data. Sampled data will be sent to central, which acts as 'back end' and communicating to onboard computer and FCU via TCP & MAVLink 
 
 Hardware:
 
@@ -79,3 +77,12 @@ Software:
 
 #### Installation
 [Sensor Network Install](https://github.com/rotary-auav-ui/cigritous/blob/ground-module/INSTALL.md)  
+
+### Web Server Branch
+
+*`webserver`*
+
+Branch for webserver front end. Acts as Web-based Ground Control Station which display agriculture and drone data from sensor network. The system is backend-less because direct sensor network communication using MQTT. Tested in Heroku
+
+#### Installation
+[Web Server Install](https://github.com/rotary-auav-ui/cigritous/blob/webserver/INSTALL.md)  
