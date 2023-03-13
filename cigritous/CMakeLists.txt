@@ -25,7 +25,6 @@ find_package(rclpy REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(px4_msgs REQUIRED)
-find_package(px4_ros_com REQUIRED)
 
 include_directories(include)
 
@@ -36,6 +35,8 @@ ament_target_dependencies(vio_bridge
   nav_msgs
   tf2
   px4_msgs)
+
+ament_export_dependencies(ament_cmake ament_cmake_python rclcpp rclpy)
 
 # Install Cpp executables
 install(TARGETS
@@ -49,8 +50,11 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}
 )
 
+# Install Python modules
+ament_python_install_package(module)
+
 install(PROGRAMS
-  scripts/precision_landing.py 
+  scripts/vision.py 
   DESTINATION lib/${PROJECT_NAME}
 )
 

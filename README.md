@@ -1,10 +1,10 @@
 # Welcome to Cigritous Repository!
 
-!['cigritous logo'](https://github.com/rotary-auav-ui/cigritous/blob/main/docs/project_logo.png | height=500)  
+!['cigritous logo'](https://github.com/rotary-auav-ui/cigritous/blob/main/docs/project_logo.png)  
 
 Cigritous is a NXP Hovergames project by Vishwakarma Research Group Universitas Indonesia for reducing yield losses from pests and weather. For our initial design, please read: https://www.hackster.io/contests/nxp-hovergames-challenge-3/hardware_applications/15385
 
-## Authors (Thanks to!)
+## Authors (Thanks to)
 - Thariq Hadyan (EE 23)
 - Benedicto Matthew W. (CE 24)
 - Raihan Syahran (EE 23)
@@ -40,34 +40,37 @@ Software:
 
 - Linux Ubuntu 22.04 LTS Jammy Jellyfish / 20.04 LTS Focal Fossa
 - ROS2 Humble Hawksbill / Foxy Fitzroy
-- PX4-Autopilot v1.13
+- PX4-Autopilot v1.13.2
 
 # Installation Tutorial
-Create ROS2 workspace
 
-`mkdir cigritous_ws && cd cigritous_ws`
+```bash
+# Create ROS2 workspace
 
-Clone the package
+mkdir cigritous_ws && cd cigritous_ws
 
-`git clone --recurse-submodules -b main https://github.com/rotary-auav-ui/cigritous.git`
+# Clone the package
 
-Rename to src
+git clone --recurse-submodules -b main https://github.com/rotary-auav-ui/cigritous.git
 
-`mv cigritous src`
+# Rename to src
 
-Build the package
+mv cigritous src
 
-`colcon build`
+# Build the package
 
-If submodule clone fails,
+colcon build
+```
 
-`cd src`
+**If submodule clone fails,**
 
-`git submodule update --init`
+```bash
+cd src
+git submodule update --init
+cd ..
+```
 
-`cd ..`
-
-Then continue to build the package
+Then continue build the package again
 
 ### Ground Module Branch
 
