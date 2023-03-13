@@ -2,8 +2,8 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>cigritous</name>
-  <version>0.7.0</version>
-  <description>Cigritous Onboard Program</description>
+  <version>0.9.5</version>
+  <description>Cigritous Drone Onboard Program</description>
   <maintainer email="rotary.auav@gmail.com">Vishwakarma Aerial Dexterity Research Group</maintainer>
   <license>BSD</license>
 
