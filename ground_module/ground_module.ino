@@ -134,7 +134,7 @@ void sendMsgRoutine() {
 
 bool reconnect() {
   // Loop until we're reconnected
-  if (!mqttClient.connected()) { // use if, not while so process not blocking
+  if (!mqttClient.connected() && WiFi.status() == WL_CONNECTED) { // use if, not while so process not blocking
     Serial.print("Attempting MQTT connection...");
     // Create a random client ID
     String clientId = "ESP32Client-";
@@ -168,6 +168,30 @@ void subscribe_cb(char* topic, byte *payload, unsigned int length) {
 
   Serial.printf("Topic : %s\nMessage : %s\n", topic, msg.c_str());
 
+  // Serial.println("GPS settings detected");
+  // static uint8_t parser, key;
+  // static float coor;
+  // char* message = (char*)malloc(length + 1);
+  // memcpy(message, payload, length);
+  // message[length] = '\0';
+  // String tpc = String(topic);
+  // String msg = String(message);
+  // free(message);
+  // Serial.println(msg + " " + tpc);
+  // parser = tpc.indexOf('/');
+  // key = tpc.substring(0, parser).toInt();
+  // String val = String(tpc.substring(parser + 1, tpc.length()));
+  // coor = msg.toFloat();
+  // if(val.equals("latitude")){
+  //   sensor_loc[key - 1][0] = coor;
+  //   Serial.printf("Sensor %u latitude set to %f\n", key - 1, coor);
+  // }else if(val.equals("longitude")){
+  //   sensor_loc[key - 1][1] = coor;
+  //   Serial.printf("Sensor %u longitude set to %f\n", key - 1, coor);
+  // }else{
+  //   Serial.println("GPS setting invalid");
+  // }
+
   // parse msg
 }
 
@@ -189,6 +213,9 @@ void publish_sensor_data(){
     mqttClient.publish("/drone/velz", String(temp[2]).c_str());
     mqttClient.publish("/drone/time", String(mavlink->get_time_boot()).c_str());
     mqttClient.publish("/drone/heading", String(mavlink->get_yaw_curr()).c_str());
+    float time = mavlink->get_time_boot();
+    mqttClient.publish("/drone/timestamp", String(time).c_str());
+
     for(i = 1; i <= TOTAL_NODE * SENSOR_COUNT; i++){
       mqttClient.publish(("/" + String(i) + "/temp").c_str(), String(sensData[i - 1].temp).c_str());
       mqttClient.publish(("/" + String(i) + "/humid").c_str(), String(sensData[i - 1].humid).c_str());
@@ -198,6 +225,7 @@ void publish_sensor_data(){
 }
 
 void recieveMavlink() {
+  mavlink->send_heartbeat();
   mavlink->read_data();
 }
 
@@ -205,7 +233,10 @@ void setup() {
   Serial.begin(115200);
 
   mavlink = std::make_shared<MAVLink>(115200, 16, 17); // Using UART2
+  
   mavlink->req_data_stream();
+  
+  mavlink->timeout(3);
 
   mesh.setDebugMsgTypes( ERROR | STARTUP | CONNECTION);  // set before init() so that you can see startup messages
 
@@ -217,17 +248,9 @@ void setup() {
   mesh.setRoot(true);
   mesh.setContainsRoot(true);
 
-  // mqttClient.setCallback(subscribe_cb);
-
-  // Receive heartbeat
-  // while(mavlink->get_px_status() != MAV_STATE_STANDBY){
-  //   Serial.println("Pixhawk not on standby!");
-  //   delay(1000);
-  // }
-
-  // while(!bme.begin()){
-  //   Serial.println("BME is not connected!");
-  // }
+  if(!bme.begin()){
+    Serial.println("BME is not connected!");
+  }
 
   // Set up oversampling and filter initialization
   bme.setTemperatureOversampling(BME680_OS_8X);
@@ -259,7 +282,7 @@ void setup() {
   if(calcR0_131 == 0){Serial.println("Warning: Conection issue found on MQ131, R0 is zero (Analog pin shorts to ground) please check your wiring and supply");}
   
   send_msg_task = std::make_shared<Task>(UPDATE_RATE, TASK_FOREVER, sendMsgRoutine);
-  mavlink_task = std::make_shared<Task>(TASK_MILLISECOND, TASK_FOREVER, recieveMavlink);
+  mavlink_task = std::make_shared<Task>(TASK_MILLISECOND * 500, TASK_FOREVER, recieveMavlink);
 
   mainscheduler.addTask(ConvTask::getFromShared(send_msg_task));
   mainscheduler.addTask(ConvTask::getFromShared(mavlink_task));
@@ -267,33 +290,23 @@ void setup() {
   send_msg_task->enable();
   mavlink_task->enable();
 
+  mqttClient.subscribe("/1/latitude");
+
   mqttClient.setCallback(subscribe_cb);
 
+  mavlink->timeout(2);
+
+  mavlink->set_fly_alt(3);
+
+  mavlink->add_waypoint(47.3976479, 8.5459404);
+
+  mavlink->add_waypoint(47.3978930, 8.5459663);
 }
 
 void loop() {
   // it will run the user scheduler as well
   mesh.update();
   mqttClient.loop();
-
-  // if(full){ // check if queue is full
-  //   mavlink->send_mission_count(SENSOR_THRES);
-  //   for(i = 0; i < SENSOR_THRES; i++){
-  //     while(mavlink->get_mis_req_status()); //wait for a request
-  //     mavlink->send_mission_item(SENSOR_LOC[queue[i] - 1][0], SENSOR_LOC[queue[i] - 1][1], fly_altitude);
-  //   }
-  //   delay(100);
-    
-  //   mavlink->takeoff(fly_altitude);
-
-  //   mavlink->start_mission();
-
-  //   mavlink->land();
-
-  //   for(i = 0; i < SENSOR_THRES; i++){
-  //     queue[i] = 0;
-  //   }
-  // }
 }
 
 // === END OF CENTRAL MODULE SOURCE CODE SECTION ===
