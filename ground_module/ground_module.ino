@@ -41,6 +41,7 @@ PubSubClient mqttClient(MQTT_SERVER, MQTT_PORT, wifiClient);
 
 std::shared_ptr<Task> send_msg_task;
 std::shared_ptr<Task> mavlink_task;
+std::shared_ptr<Task> waypoint_task;
 
 std::shared_ptr<MAVLink> mavlink;
 
@@ -50,6 +51,7 @@ uint8_t queue[SENSOR_THRES] = {0};
 uint32_t nexttime=0;
 uint8_t  initialized=0;
 bool full;
+bool sent = false;
 static float home_location[2], sensor_loc[TOTAL_NODE * SENSOR_COUNT][2]; //read from backend in init_sensor_location
 
 struct Node{
@@ -225,18 +227,24 @@ void publish_sensor_data(){
 }
 
 void recieveMavlink() {
-  mavlink->send_heartbeat();
+  // mavlink->send_heartbeat();
   mavlink->read_data();
+}
+
+void send_waypoints(){
+  if(mavlink->px_mode != 0 && mavlink->px_status != 0 && sent == false){
+    mavlink->set_fly_alt(3);
+    mavlink->add_waypoint(25.1599886, 60.9326207);
+    mavlink->add_waypoint(25.1599886, 60.9326209);
+    mavlink->send_mission();
+    sent = true;
+  }
 }
 
 void setup() {
   Serial.begin(115200);
 
-  mavlink = std::make_shared<MAVLink>(115200, 16, 17); // Using UART2
-  
-  mavlink->req_data_stream();
-  
-  mavlink->timeout(3);
+  mavlink = std::make_shared<MAVLink>(57600, 16, 17); // Using UART2
 
   mesh.setDebugMsgTypes( ERROR | STARTUP | CONNECTION);  // set before init() so that you can see startup messages
 
@@ -282,25 +290,20 @@ void setup() {
   if(calcR0_131 == 0){Serial.println("Warning: Conection issue found on MQ131, R0 is zero (Analog pin shorts to ground) please check your wiring and supply");}
   
   send_msg_task = std::make_shared<Task>(UPDATE_RATE, TASK_FOREVER, sendMsgRoutine);
-  mavlink_task = std::make_shared<Task>(TASK_MILLISECOND * 500, TASK_FOREVER, recieveMavlink);
+  mavlink_task = std::make_shared<Task>(TASK_MILLISECOND, TASK_FOREVER, recieveMavlink);
+  waypoint_task = std::make_shared<Task>(TASK_MILLISECOND * 5000, TASK_FOREVER, send_waypoints);
 
   mainscheduler.addTask(ConvTask::getFromShared(send_msg_task));
   mainscheduler.addTask(ConvTask::getFromShared(mavlink_task));
+  mainscheduler.addTask(ConvTask::getFromShared(waypoint_task));
 
   send_msg_task->enable();
   mavlink_task->enable();
+  waypoint_task->enable();
 
   mqttClient.subscribe("/1/latitude");
 
   mqttClient.setCallback(subscribe_cb);
-
-  mavlink->timeout(2);
-
-  mavlink->set_fly_alt(3);
-
-  mavlink->add_waypoint(47.3976479, 8.5459404);
-
-  mavlink->add_waypoint(47.3978930, 8.5459663);
 }
 
 void loop() {
