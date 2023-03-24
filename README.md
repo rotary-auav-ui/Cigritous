@@ -1,7 +1,5 @@
 # Welcome to Cigritous GROUND MODULE Branch!
 
-## ALERT: WIP/Work In Progress!
-
 ## Information
 
 Hardware:
