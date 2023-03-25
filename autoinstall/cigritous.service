@@ -1,0 +1,13 @@
+[Unit]
+Description=Cigritous service for autostart
+After=network.target
+
+[Service]
+Restart=always
+TimeoutStartSec=10
+User=user
+WorkingDirectory=~
+ExecStart=/usr/local/bin/cigritous_autostart.sh
+
+[Install]
+WantedBy=multi-user.target

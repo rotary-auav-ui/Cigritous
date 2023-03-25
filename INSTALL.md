@@ -44,6 +44,11 @@ git clone --recurse-submodules -b main https://github.com/rotary-auav-ui/cigrito
 mv cigritous src
 
 colcon build
+
+chmod +x demo.sh
+
+./install_autostart.sh
+
 ```
 
 **If submodule clone fails,**
