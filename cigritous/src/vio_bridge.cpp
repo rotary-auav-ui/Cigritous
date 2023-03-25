@@ -3,6 +3,7 @@
 #include <functional>
 #include <array>
 #include <cmath>
+#include <vector>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -18,56 +19,67 @@
 using namespace std::placeholders;
 using namespace std::chrono_literals;
 
-class VioBridge {
+class VioBridge : public rclcpp::Node {
   public:
-    VioBridge(rclcpp::Node::SharedPtr& node_) : node(node_) {
+    VioBridge() : Node("vio_bridge") {
 			// Initiate in constructor because these data is useless after q_rot is calculated (Destroy when constructor is done)
-			// PUBLISH AND SUBSCRIBE TOPIC NAME
-			std::string ODOM_SUB_TOPIC = "camera/odom/sample";
-			std::string VISION_PUB_TOPIC = "fmu/vehicle_visual_odometry/out";
+			RCLCPP_INFO(this->get_logger(), "Initializing VIO-PX4 bridge program");
 
-			// SET BODY ROLL PITCH YAW 
-			float SET_BODY_ROLL = 0;
-			float SET_BODY_PITCH = 0;
-			float SET_BODY_YAW = 0;
-			// SET CAM ROLL PITCH YAW 
-			float SET_CAM_ROLL = 0;
-			float SET_CAM_PITCH = 0; 
-			float SET_CAM_YAW = 0;
-			// SET VIO PUBLISH RATE
-			float rate = 30; // in Hz
+			std::string ODOM_SUB_TOPIC = this->declare_parameter<std::string>("topic.sub_odom", "odometry_sub");
+			std::string VISION_PUB_TOPIC = this->declare_parameter<std::string>("topic.pub_vision", "vision_pub");
+
+			auto body_tf = this->declare_parameters<float>(
+				"frame_rotation",
+				{
+					{"roll", 0},
+					{"pitch", 0},
+					{"yaw", 0}
+				});
+
+			auto camera_tf = this->declare_parameters<float>(
+				"camera2body_rotation",
+				{
+					{"roll", 0},
+					{"pitch", 0},
+					{"yaw", 0}
+				});
+
+			int rate = this->declare_parameter<int>("publish_rate", 30);
+
+			WITH_COV = this->declare_parameter<bool>("use_covariance", false);
+			WITH_VEL = this->declare_parameter<bool>("use_velocity", false);
 
 			// Initiate in constructor because these data is useless after q_rot is calculated (Destroy when constructor is done)
 			tf2::Quaternion q_cam_enu, q_body_enu;
-			q_cam_enu.setRPY(radians(SET_CAM_ROLL), radians(SET_CAM_PITCH), radians(SET_CAM_YAW));
-			q_body_enu.setRPY(radians(SET_BODY_ROLL), radians(SET_BODY_PITCH), radians(SET_BODY_YAW));
+			q_cam_enu.setRPY(radians(camera_tf[0]), radians(camera_tf[1]), radians(camera_tf[2]));
+			q_body_enu.setRPY(radians(body_tf[0]), radians(body_tf[1]), radians(body_tf[2]));
 			q_rot = q_cam_enu * q_body_enu;
 			m_rot = tf2::Matrix3x3(q_rot);
-			RCLCPP_INFO(node->get_logger(), "Transform cam; Roll: %f | Pitch: %f | Yaw: %f", SET_CAM_ROLL, SET_CAM_PITCH, SET_CAM_YAW);
-			RCLCPP_INFO(node->get_logger(), "Transform body; Roll: %f | Pitch: %f | Yaw: %f", SET_CAM_ROLL, SET_CAM_PITCH, SET_CAM_YAW);
+			RCLCPP_INFO(this->get_logger(), "Transform cam; Roll: %f | Pitch: %f | Yaw: %f", camera_tf[0], camera_tf[1], camera_tf[2]);
+			RCLCPP_INFO(this->get_logger(), "Transform body; Roll: %f | Pitch: %f | Yaw: %f", body_tf[0], body_tf[1], body_tf[2]);
 
-			odometry_sub = node->create_subscription<nav_msgs::msg::Odometry>(ODOM_SUB_TOPIC, 10, std::bind(&VioBridge::odometry_sub_cb, this, _1));
-			RCLCPP_INFO(node->get_logger(), "Odometry subscriber topic: %s", ODOM_SUB_TOPIC.c_str());
+			odometry_sub = this->create_subscription<nav_msgs::msg::Odometry>(ODOM_SUB_TOPIC, 10, std::bind(&VioBridge::odometry_sub_cb, this, _1));
+			RCLCPP_INFO(this->get_logger(), "Odometry subscriber topic: %s", ODOM_SUB_TOPIC.c_str());
 
-			odometry_pub = node->create_publisher<px4_msgs::msg::VehicleVisualOdometry>(VISION_PUB_TOPIC, 10);
-			RCLCPP_INFO(node->get_logger(), "Odometry publisher topic: %s", VISION_PUB_TOPIC.c_str());
-			RCLCPP_INFO(node->get_logger(), "Covariance Data: %s", WITH_COV ? "Used" : "Not Used");
-			RCLCPP_INFO(node->get_logger(), "Velocity Data: %s", WITH_SPD ? "Used" : "Not Used");
+			odometry_pub = this->create_publisher<px4_msgs::msg::VehicleVisualOdometry>(VISION_PUB_TOPIC, 10);
+			RCLCPP_INFO(this->get_logger(), "Odometry publisher topic: %s", VISION_PUB_TOPIC.c_str());
+			RCLCPP_INFO(this->get_logger(), "Covariance Data: %s", WITH_COV ? "Used" : "Not Used");
+			RCLCPP_INFO(this->get_logger(), "Velocity Data: %s", WITH_VEL ? "Used" : "Not Used");
 
-			timer = node->create_wall_timer(std::chrono::milliseconds(int(1e3/rate)), std::bind(&VioBridge::publish, this));
+			timer = this->create_wall_timer(std::chrono::milliseconds(int(1e3/rate)), std::bind(&VioBridge::publish, this));
 
-			last_odom_time = node->now();
+			last_odom_time = this->now();
 		}
 
     void publish() {
 
 			if (odometry_sub->get_publisher_count() == 0) {
-		    RCLCPP_WARN(node->get_logger(), "No VIO data. Waiting");
+		    RCLCPP_WARN(this->get_logger(), "No VIO data. Waiting");
         rclcpp::sleep_for(1s);
 				return;
 			}
 
-			odom_proc.timestamp = int(node->now().seconds() / 1e3); // in microseconds
+			odom_proc.timestamp = int(this->now().seconds() / 1e3); // in microseconds
 			odom_proc.local_frame = px4_msgs::msg::VehicleVisualOdometry::LOCAL_FRAME_NED;
 			
 			// CALCULATE ORIENTATION
@@ -98,7 +110,7 @@ class VioBridge {
 				odom_proc.pose_covariance = toMsgPX4(pose_cov_proc, rot_pose_cov_proc);
 			}
 
-			if (WITH_SPD) {
+			if (WITH_VEL) {
 				odom_proc.velocity_frame = px4_msgs::msg::VehicleVisualOdometry::LOCAL_FRAME_NED;
 
 				// CALCULATE LINEAR VELOCITY
@@ -157,7 +169,7 @@ class VioBridge {
     tf2::Matrix3x3 m_rot;
 
     bool WITH_COV;
-    bool WITH_SPD;
+    bool WITH_VEL;
 
 		void fromMsgLT(const std::array<double, 36>& data, tf2::Matrix3x3& mat3x3) {
 			mat3x3.setValue(data[0], 0, 0,
@@ -213,8 +225,8 @@ class VioBridge {
 			}
 
 			if(last_odom_time >= msg->header.stamp) {
-				RCLCPP_ERROR(node->get_logger(), "Odometry data lagging");
-				RCLCPP_ERROR(node->get_logger(), "Shutting odometry node");
+				RCLCPP_ERROR(this->get_logger(), "Odometry data lagging");
+				RCLCPP_ERROR(this->get_logger(), "Shutting odometry node");
 				rclcpp::shutdown();
 			}
 
@@ -226,11 +238,9 @@ class VioBridge {
 int main(int argc, char **argv)
 {
   rclcpp::init(argc, argv);
-  
-  auto node = rclcpp::Node::make_shared("vio_bridge");
-  
-  VioBridge bridge(node);
-  
+
+	auto node = std::make_shared<VioBridge>();
+
   rclcpp::spin(node);
   rclcpp::shutdown();
   return 0;

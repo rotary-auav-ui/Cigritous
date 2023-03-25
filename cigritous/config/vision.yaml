@@ -1,0 +1,13 @@
+vision:
+  ros__parameters:
+    publish_rate: 30 # in Hz
+    mqtt:
+      port: 18789
+      broker: "driver.cloudmqtt.com"
+      username: "cbobzrgp"
+      password: "CKvOQLxrtuqc"
+
+    precision_land:
+      kp: 0.1
+      radius: 15 # in pixels
+      height: 0.2

@@ -50,6 +50,11 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}
 )
 
+# Install yaml parameters file
+install(DIRECTORY config
+  DESTINATION share/${PROJECT_NAME}
+)
+
 # Install Python modules
 ament_python_install_package(module)
 

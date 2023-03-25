@@ -1,0 +1,23 @@
+vio_bridge:
+  ros__parameters:
+    topic:
+      sub_odom: "camera/odom/sample"
+      pub_vision: "fmu/vehicle_visual_odometry/out"
+
+    use_velocity: true
+    use_covariance: true
+
+    # RealSense T265 setting
+    # all value in degrees
+    frame_rotation:
+      roll: 0.0
+      pitch: 0.0
+      yaw: 0.0
+
+    camera2body_rotation:
+      roll: 0.0
+      pitch: 0.0
+      yaw: 90.0
+
+    # rate of publishing odometry data to FCU
+    publish_rate: 30 # in Hz
