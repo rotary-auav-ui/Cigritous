@@ -10,7 +10,7 @@ class CrowDetection():
         os.environ['USE_GPU_INFERENCE'] = "0"
 
         ext_delegate_path = '/lib/libvx_delegate.so'
-        model_path = 'mobilenet_v1_1.0_224_quant.tflite'
+        model_path = 'crow-int8.tflite'
         
         delegate = tflite.load_delegate(ext_delegate_path)
 

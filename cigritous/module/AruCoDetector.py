@@ -19,15 +19,11 @@ class AruCoDetector():
 
         corners, _, _ = cv2.aruco.detectMarkers(frame, self.aruco_dict, parameters=self.aruco_params)
         
-        detections = len(corners)
         xy = np.zeros(2)
 
-        for i in range(detections):
-            # extract the marker corners (which are always returned in
-            # top-left, top-right, bottom-right, and bottom-left order)
-            tl, _, br, _ = corners[i].reshape((4, 2)).astype(int)
+        tl, _, br, _ = corners[0].reshape((4, 2)).astype(int)
 
-            xy = ((tl + br) / 2).astype(int)
+        xy = ((tl + br) / 2).astype(int)
 
-        return detections, xy[0], xy[1]
+        return xy[0], xy[1]
     
