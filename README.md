@@ -44,8 +44,8 @@ Software:
 - ROS2 Humble Hawksbill / Foxy Fitzroy
 - PX4-Autopilot v1.13.2
 
-#### Installation
-[Drone Onboard Program Install](https://github.com/rotary-auav-ui/cigritous/blob/main/INSTALL.md)  
+#### Installation and Usage
+[Click Here](https://github.com/rotary-auav-ui/cigritous/blob/main/INSTALL.md)  
 
 ### Sensor Network / Ground Module Branch
 
@@ -75,8 +75,8 @@ Software:
   - MQTT library
   - Bosch BME68x library
 
-#### Installation
-[Sensor Network Install](https://github.com/rotary-auav-ui/cigritous/blob/ground-module/INSTALL.md)  
+#### Installation and Usage
+[Click Here](https://github.com/rotary-auav-ui/cigritous/blob/ground-module/INSTALL.md)  
 
 ### Web Server Branch
 
