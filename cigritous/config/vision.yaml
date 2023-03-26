@@ -9,5 +9,5 @@ vision:
 
     precision_land:
       kp: 0.1
-      radius: 15 # in pixels
+      radius: 10 # in pixels
       height: 0.2
