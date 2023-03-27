@@ -158,7 +158,7 @@ bool reconnect() {
       return false;
     }
   }
-  return false;
+  return true;
 }
 
 void subscribe_cb(char* topic, byte *payload, unsigned int length) {
@@ -204,19 +204,22 @@ void publish_sensor_data(){
     mqttClient.publish("/central/press", (String(bme.pressure)).c_str());
     mqttClient.publish("/central/humid", (String(bme.humidity)).c_str());
     mqttClient.publish("/central/gas", (String(bme.gas_resistance)).c_str());
-    std::array<float, 3> temp;
+    static std::array<float, 3> temp;
     temp = mavlink->get_global_pos_curr();
-    mqttClient.publish("/drone/latitude", String(temp[0]).c_str());
-    mqttClient.publish("/drone/longitude", String(temp[1]).c_str());
-    mqttClient.publish("/drone/altitude", String(temp[2]).c_str());
+    mqttClient.publish("/drone/lat", String(temp[0]).c_str());
+    mqttClient.publish("/drone/lng", String(temp[1]).c_str());
+    mqttClient.publish("/drone/alt", String(temp[2]).c_str());
     temp = mavlink->get_velocity_curr();
-    mqttClient.publish("/drone/velx", String(temp[0]).c_str());
-    mqttClient.publish("/drone/vely", String(temp[1]).c_str());
-    mqttClient.publish("/drone/velz", String(temp[2]).c_str());
+    mqttClient.publish("/drone/vx", String(temp[0]).c_str());
+    mqttClient.publish("/drone/vy", String(temp[1]).c_str());
+    mqttClient.publish("/drone/vz", String(temp[2]).c_str());
     mqttClient.publish("/drone/time", String(mavlink->get_time_boot()).c_str());
-    mqttClient.publish("/drone/heading", String(mavlink->get_yaw_curr()).c_str());
-    float time = mavlink->get_time_boot();
-    mqttClient.publish("/drone/timestamp", String(time).c_str());
+    mqttClient.publish("/drone/yaw_curr", String(mavlink->get_yaw_curr()).c_str());
+    
+    mqttClient.publish("/drone/progress", String(mavlink->get_mis_reached()).c_str()); 
+    mqttClient.publish("/drone/battery", String(mavlink->get_battery_status()).c_str()); 
+    mqttClient.publish("/drone/status", String((int)mavlink->get_armed()).c_str()); 
+    
 
     for(i = 1; i <= TOTAL_NODE * SENSOR_COUNT; i++){
       mqttClient.publish(("/" + String(i) + "/temp").c_str(), String(sensData[i - 1].temp).c_str());
@@ -227,7 +230,6 @@ void publish_sensor_data(){
 }
 
 void recieveMavlink() {
-  // mavlink->send_heartbeat();
   mavlink->read_data();
 }
 
@@ -291,15 +293,15 @@ void setup() {
   
   send_msg_task = std::make_shared<Task>(UPDATE_RATE, TASK_FOREVER, sendMsgRoutine);
   mavlink_task = std::make_shared<Task>(TASK_MILLISECOND, TASK_FOREVER, recieveMavlink);
-  waypoint_task = std::make_shared<Task>(TASK_MILLISECOND * 5000, TASK_FOREVER, send_waypoints);
+  // waypoint_task = std::make_shared<Task>(TASK_MILLISECOND * 5000, TASK_FOREVER, send_waypoints);
 
   mainscheduler.addTask(ConvTask::getFromShared(send_msg_task));
   mainscheduler.addTask(ConvTask::getFromShared(mavlink_task));
-  mainscheduler.addTask(ConvTask::getFromShared(waypoint_task));
+  // mainscheduler.addTask(ConvTask::getFromShared(waypoint_task));
 
   send_msg_task->enable();
   mavlink_task->enable();
-  waypoint_task->enable();
+  // waypoint_task->enable();
 
   mqttClient.subscribe("/1/latitude");
 
