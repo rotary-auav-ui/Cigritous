@@ -136,7 +136,10 @@ void sendMsgRoutine() {
 
 bool reconnect() {
   // Loop until we're reconnected
-  if (!mqttClient.connected() && WiFi.status() == WL_CONNECTED) { // use if, not while so process not blocking
+  if(!(WiFi.status() == WL_CONNECTED)){
+    return false;
+  }
+  if (!mqttClient.connected()) { // use if, not while so process not blocking
     Serial.print("Attempting MQTT connection...");
     // Create a random client ID
     String clientId = "ESP32Client-";
@@ -205,10 +208,15 @@ void publish_sensor_data(){
     mqttClient.publish("/central/humid", (String(bme.humidity)).c_str());
     mqttClient.publish("/central/gas", (String(bme.gas_resistance)).c_str());
     static std::array<float, 3> temp;
-    temp = mavlink->get_global_pos_curr();
-    mqttClient.publish("/drone/lat", String(temp[0]).c_str());
-    mqttClient.publish("/drone/lng", String(temp[1]).c_str());
-    mqttClient.publish("/drone/alt", String(temp[2]).c_str());
+    // temp = mavlink->get_global_pos_curr();
+    // mqttClient.publish("/drone/lat", String(temp[0]).c_str());
+    // mqttClient.publish("/drone/lng", String(temp[1]).c_str());
+    // mqttClient.publish("/drone/alt", String(temp[2]).c_str());
+    static std::array<int32_t, 3> pose = {-63648000, 1068245000, 5};    
+    mqttClient.publish("/drone/lat", String(pose[0]).c_str());
+    mqttClient.publish("/drone/lng", String(pose[1]).c_str());
+    mqttClient.publish("/drone/alt", String(pose[2]).c_str());
+    pose[0] += 101; pose[1] += 101;    
     temp = mavlink->get_velocity_curr();
     mqttClient.publish("/drone/vx", String(temp[0]).c_str());
     mqttClient.publish("/drone/vy", String(temp[1]).c_str());
@@ -230,11 +238,11 @@ void publish_sensor_data(){
 }
 
 void recieveMavlink() {
-  mavlink->read_data();
+  mavlink->send_heartbeat();
 }
 
 void send_waypoints(){
-  if(mavlink->px_mode != 0 && mavlink->px_status != 0 && sent == false){
+  if(mavlink->get_px_mode() != 0 && mavlink->get_px_status() != 0 && sent == false){
     mavlink->set_fly_alt(3);
     mavlink->add_waypoint(25.1599886, 60.9326207);
     mavlink->add_waypoint(25.1599886, 60.9326209);
@@ -292,16 +300,16 @@ void setup() {
   if(calcR0_131 == 0){Serial.println("Warning: Conection issue found on MQ131, R0 is zero (Analog pin shorts to ground) please check your wiring and supply");}
   
   send_msg_task = std::make_shared<Task>(UPDATE_RATE, TASK_FOREVER, sendMsgRoutine);
-  mavlink_task = std::make_shared<Task>(TASK_MILLISECOND, TASK_FOREVER, recieveMavlink);
-  // waypoint_task = std::make_shared<Task>(TASK_MILLISECOND * 5000, TASK_FOREVER, send_waypoints);
+  mavlink_task = std::make_shared<Task>(TASK_SECOND, TASK_FOREVER, recieveMavlink);
+  waypoint_task = std::make_shared<Task>(TASK_MILLISECOND * 5000, TASK_FOREVER, send_waypoints);
 
   mainscheduler.addTask(ConvTask::getFromShared(send_msg_task));
   mainscheduler.addTask(ConvTask::getFromShared(mavlink_task));
-  // mainscheduler.addTask(ConvTask::getFromShared(waypoint_task));
+  mainscheduler.addTask(ConvTask::getFromShared(waypoint_task));
 
   send_msg_task->enable();
   mavlink_task->enable();
-  // waypoint_task->enable();
+  waypoint_task->enable();
 
   mqttClient.subscribe("/1/latitude");
 
@@ -312,6 +320,7 @@ void loop() {
   // it will run the user scheduler as well
   mesh.update();
   mqttClient.loop();
+  mavlink->read_data();
 }
 
 // === END OF CENTRAL MODULE SOURCE CODE SECTION ===
@@ -356,7 +365,7 @@ void readSensorRoutine() {
     moisture[i] = 32; // yl3869[i]->read();
     Serial.printf("humid %f\n temperature %f", humid[i], temp[i]);
   }
-
+re
   Serial.println("Sensor data read");
 
   if (mesh.isConnected(1)) Serial.println("Connected to central module. Sending");

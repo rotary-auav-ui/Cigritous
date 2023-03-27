@@ -36,7 +36,7 @@ constexpr uint8_t SENSOR_COUNT = floor( (dht_sensor_count + moist_sensor_count) 
   #define MOIST_THRES   40
   #define TOTAL_NODE    1
   #define MQ131_PIN     5
-  constexpr uint64_t UPDATE_RATE = 5 * TASK_SECOND;
+  constexpr uint64_t UPDATE_RATE = TASK_SECOND;
 #else
   constexpr uint64_t REPEAT_SEND_RATE = 2 * TASK_SECOND;
   constexpr uint64_t UPDATE_RATE = 2 * TASK_HOUR;
