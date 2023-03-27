@@ -34,9 +34,6 @@
 [submodule "libraries/Adafruit_Sensor"]
 	path = libraries/Adafruit_Sensor
 	url = https://github.com/adafruit/Adafruit_Sensor.git
-[submodule "libraries/Arduino-ESP32-MAVLink"]
-	path = libraries/mavlink-c-library
-	url = https://github.com/rotary-auav-ui/Arduino-ESP32-MAVLink.git
 [submodule "libraries/pubsubclient"]
 	path = libraries/pubsubclient
 	url = https://github.com/knolleary/pubsubclient.git
