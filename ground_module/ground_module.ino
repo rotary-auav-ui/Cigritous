@@ -13,7 +13,7 @@ constexpr float fly_altitude = 5; //relative to home
 
 //sending to backend
 #include <WiFi.h>
-#include <PubSubClient.h>
+#include <MQTT.h>
 
 //mavlink
 #include <mavlink_commands.hpp>
@@ -36,8 +36,7 @@ Scheduler mainscheduler; // task scheduler
 painlessMesh mesh;
 
 WiFiClient wifiClient;
-
-PubSubClient mqttClient(MQTT_SERVER, MQTT_PORT, wifiClient);
+MQTTClient mqttClient;
 
 std::shared_ptr<Task> send_msg_task;
 std::shared_ptr<Task> mavlink_task;
@@ -136,26 +135,24 @@ void sendMsgRoutine() {
 
 bool reconnect() {
   // Loop until we're reconnected
-  if(!(WiFi.status() == WL_CONNECTED)){
+  if(WiFi.status() != WL_CONNECTED) {
+    Serial.print("WiFi disconnected!");
     return false;
   }
   if (!mqttClient.connected()) { // use if, not while so process not blocking
     Serial.print("Attempting MQTT connection...");
     // Create a random client ID
-    String clientId = "ESP32Client-";
-    clientId += String(random(0xffff), HEX);
     // Attempt to connect
-    if (mqttClient.connect(clientId.c_str(), MQTT_USERNAME, MQTT_PASSWORD)) {
+    if (mqttClient.connect(MQTT_CLIENTID, MQTT_USERNAME, MQTT_PASSWORD)) {
       Serial.println("connected");
       //Once connected, publish an announcement...
       mqttClient.publish("/hello", "Hello from central");
       // ... and resubscribe
+      mqttClient.subscribe("/1/latitude");
       // mqttCsubscribe(MQTT_SERIAL_RECEIVER_CH);
       return true;
     } else {
-      Serial.print("failed, rc=");
-      Serial.print(mqttClient.state());
-      Serial.println(" try again in 5 seconds");
+      Serial.print("failed, try again in 5 seconds");
       // Wait 5 seconds before retrying
       delay(5000);
       return false;
@@ -164,14 +161,9 @@ bool reconnect() {
   return true;
 }
 
-void subscribe_cb(char* topic, byte *payload, unsigned int length) {
-  char* cleanPayload = (char*)malloc(length+1);
-  memcpy(cleanPayload, payload, length);
-  cleanPayload[length] = '\0';
-  String msg = String(cleanPayload);
-  free(cleanPayload);
+void subscribe_cb(String& topic, String& payload) {
 
-  Serial.printf("Topic : %s\nMessage : %s\n", topic, msg.c_str());
+  Serial.println("incoming: " + topic + " - " + payload);
 
   // Serial.println("GPS settings detected");
   // static uint8_t parser, key;
@@ -201,39 +193,39 @@ void subscribe_cb(char* topic, byte *payload, unsigned int length) {
 }
 
 void publish_sensor_data(){
-  if(reconnect()){
-    Serial.println("Publishing sensor data");
-    mqttClient.publish("/central/temp", (String(bme.temperature)).c_str());
-    mqttClient.publish("/central/press", (String(bme.pressure)).c_str());
-    mqttClient.publish("/central/humid", (String(bme.humidity)).c_str());
-    mqttClient.publish("/central/gas", (String(bme.gas_resistance)).c_str());
-    static std::array<float, 3> temp;
-    // temp = mavlink->get_global_pos_curr();
-    // mqttClient.publish("/drone/lat", String(temp[0]).c_str());
-    // mqttClient.publish("/drone/lng", String(temp[1]).c_str());
-    // mqttClient.publish("/drone/alt", String(temp[2]).c_str());
-    static std::array<int32_t, 3> pose = {-63648000, 1068245000, 5};    
-    mqttClient.publish("/drone/lat", String(pose[0]).c_str());
-    mqttClient.publish("/drone/lng", String(pose[1]).c_str());
-    mqttClient.publish("/drone/alt", String(pose[2]).c_str());
-    pose[0] += 101; pose[1] += 101;    
-    temp = mavlink->get_velocity_curr();
-    mqttClient.publish("/drone/vx", String(temp[0]).c_str());
-    mqttClient.publish("/drone/vy", String(temp[1]).c_str());
-    mqttClient.publish("/drone/vz", String(temp[2]).c_str());
-    mqttClient.publish("/drone/time", String(mavlink->get_time_boot()).c_str());
-    mqttClient.publish("/drone/yaw_curr", String(mavlink->get_yaw_curr()).c_str());
-    
-    mqttClient.publish("/drone/progress", String(mavlink->get_mis_reached()).c_str()); 
-    mqttClient.publish("/drone/battery", String(mavlink->get_battery_status()).c_str()); 
-    mqttClient.publish("/drone/status", String((int)mavlink->get_armed()).c_str()); 
-    
+  if(!reconnect()) return; // use guard condition
+  
+  Serial.println("Publishing sensor data");
+  mqttClient.publish("/central/temp", (String(bme.temperature)).c_str());
+  mqttClient.publish("/central/press", (String(bme.pressure)).c_str());
+  mqttClient.publish("/central/humid", (String(bme.humidity)).c_str());
+  mqttClient.publish("/central/gas", (String(bme.gas_resistance)).c_str());
+  static std::array<float, 3> temp;
+  // temp = mavlink->get_global_pos_curr();
+  // mqttClient.publish("/drone/lat", String(temp[0]).c_str());
+  // mqttClient.publish("/drone/lng", String(temp[1]).c_str());
+  // mqttClient.publish("/drone/alt", String(temp[2]).c_str());
+  static std::array<int32_t, 3> pose = {-63648000, 1068245000, 5};    
+  mqttClient.publish("/drone/lat", String(pose[0]).c_str());
+  mqttClient.publish("/drone/lng", String(pose[1]).c_str());
+  mqttClient.publish("/drone/alt", String(pose[2]).c_str());
+  pose[0] += 101; pose[1] += 101;    
+  temp = mavlink->get_velocity_curr();
+  mqttClient.publish("/drone/vx", String(temp[0]).c_str());
+  mqttClient.publish("/drone/vy", String(temp[1]).c_str());
+  mqttClient.publish("/drone/vz", String(temp[2]).c_str());
+  mqttClient.publish("/drone/time", String(mavlink->get_time_boot()).c_str());
+  mqttClient.publish("/drone/yaw_curr", String(mavlink->get_yaw_curr()).c_str());
+  
+  mqttClient.publish("/drone/progress", String(mavlink->get_mis_reached()).c_str()); 
+  mqttClient.publish("/drone/battery", String(mavlink->get_battery_status()).c_str()); 
+  mqttClient.publish("/drone/status", String((int)mavlink->get_armed()).c_str()); 
+  
 
-    for(i = 1; i <= TOTAL_NODE * SENSOR_COUNT; i++){
-      mqttClient.publish(("/" + String(i) + "/temp").c_str(), String(sensData[i - 1].temp).c_str());
-      mqttClient.publish(("/" + String(i) + "/humid").c_str(), String(sensData[i - 1].humid).c_str());
-      mqttClient.publish(("/" + String(i) + "/moist").c_str(), String(sensData[i - 1].moisture).c_str());
-    }
+  for(i = 1; i <= TOTAL_NODE * SENSOR_COUNT; i++){
+    mqttClient.publish(("/" + String(i) + "/temp").c_str(), String(sensData[i - 1].temp).c_str());
+    mqttClient.publish(("/" + String(i) + "/humid").c_str(), String(sensData[i - 1].humid).c_str());
+    mqttClient.publish(("/" + String(i) + "/moist").c_str(), String(sensData[i - 1].moisture).c_str());
   }
 }
 
@@ -311,9 +303,8 @@ void setup() {
   mavlink_task->enable();
   waypoint_task->enable();
 
-  mqttClient.subscribe("/1/latitude");
-
-  mqttClient.setCallback(subscribe_cb);
+  mqttClient.begin(MQTT_BROKER, wifiClient);
+  mqttClient.onMessage(subscribe_cb);
 }
 
 void loop() {

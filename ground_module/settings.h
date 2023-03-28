@@ -24,9 +24,10 @@ constexpr uint8_t SENSOR_COUNT = floor( (dht_sensor_count + moist_sensor_count) 
 
 
 #if defined(CENTRAL_MODULE)
-  #define MQTT_SERVER   "driver.cloudmqtt.com"
+  #define MQTT_BROKER   "driver.cloudmqtt.com"
   #define MQTT_USERNAME "cbobzrgp"
   #define MQTT_PASSWORD "CKvOQLxrtuqc"
+  #define MQTT_CLIENTID "ESP32Central"
   #define MQTT_PORT     18789
   #define WIFI_SSID     "JuanJonathan"
   #define WIFI_PASSWORD "123juan123;"
