@@ -3,9 +3,6 @@
 #if defined(CENTRAL_MODULE)
 // === CENTRAL MODULE SECTION /SOURCE CODE ===
 
-//latitude and longitude of home and sensor. Change to static float when able to read from backend
-constexpr float fly_altitude = 5; //relative to home
-
 //sensors
 #include "MQUnifiedsensor.h"
 #include <Adafruit_Sensor.h>
@@ -18,18 +15,13 @@ constexpr float fly_altitude = 5; //relative to home
 //mavlink
 #include <mavlink_commands.hpp>
 #include <memory>
+#include <array>
 
 #define BOARD "ESP32"
 #define V_RES 3.3
 #define ADC_BIT 12
 
-#define RAT_MQ131_CA 15
-
-#define NUM_OF_MISSION 3
-
 Adafruit_BME680 bme;
-
-MQUnifiedsensor MQ131(BOARD, V_RES, ADC_BIT, MQ131_PIN, "MQ-131");
 
 Scheduler mainscheduler; // task scheduler
 
@@ -47,18 +39,14 @@ std::shared_ptr<MAVLink> mavlink;
 uint8_t i = 0;
 uint8_t total_id, node, sens;
 uint8_t queue[SENSOR_THRES] = {0};
-uint32_t nexttime=0;
-uint8_t  initialized=0;
 bool full;
-bool sent = false;
-static float home_location[2], sensor_loc[TOTAL_NODE * SENSOR_COUNT][2]; //read from backend in init_sensor_location
+static float sensor_loc[TOTAL_NODE * SENSOR_COUNT][2]; //read from web
 
 struct Node{
   uint8_t id;
   float humid;
   float moisture;
   float temp;
-  float ozone;
   float gas;
 }sensData[TOTAL_NODE * SENSOR_COUNT];
 
@@ -66,13 +54,8 @@ struct Central{
   float humid;
   float temp;
   float presure;
-  float ozone;
   float gas;
 }central;
-
-void init_sensor_locations(){
-  //read from backend, for now keep static
-}
 
 void parseMsg(const String& msg) {
   static size_t pos[3];
@@ -80,16 +63,15 @@ void parseMsg(const String& msg) {
   pos[1] = msg.indexOf("/", pos[0]+1);
   pos[2] = msg.indexOf("/", pos[1]+1);
   sens = msg.substring(0, pos[0]).toInt();
-  total_id = ((node - 1) - 1) * SENSOR_COUNT + sens;
-  sensData[total_id - 1].id = total_id;
-  sensData[total_id - 1].temp = msg.substring(pos[1]+1, pos[2]-1).toFloat();
-  sensData[total_id - 1].moisture = msg.substring(pos[2]+1, msg.length()).toFloat();
-  sensData[total_id - 1].humid = msg.substring(pos[0]+1, pos[1]-1).toFloat();
+  sensData[sens - 1].id = sens;
+  sensData[sens - 1].temp = msg.substring(pos[1]+1, pos[2]-1).toFloat();
+  sensData[sens - 1].moisture = msg.substring(pos[2]+1, msg.length()).toFloat();
+  sensData[sens - 1].humid = msg.substring(pos[0]+1, pos[1]-1).toFloat();
   Serial.println(
-    String(sensData[total_id - 1].id) + " " +
-    String(sensData[total_id - 1].temp) + " " +
-    String(sensData[total_id - 1].moisture) + " " +
-    String(sensData[total_id - 1].humid) + " "
+    String(sensData[sens - 1].id) + " " +
+    String(sensData[sens - 1].temp) + " " +
+    String(sensData[sens - 1].moisture) + " " +
+    String(sensData[sens - 1].humid) + " "
   );
 }
 
@@ -109,28 +91,29 @@ void sendMsgRoutine() {
     Serial.println("BME688 failed to perform reading!");
   }
 
-  MQ131.update();
-
-  central.ozone = MQ131.readSensorR0Rs();
-
-  // TODO : Set thresholds for certain plants and saves their respective sensor id.
-
-  // TODO: send to back-end
-
   publish_sensor_data();
 
-  // if(sensData.temp > TEMP_THRES && 
-  //   sensData.humid < HUMID_THRES && 
-  //   sensData.moisture < MOIST_THRES
-  // ){
-  //   for(i = 0; i < SENSOR_THRES; i++){
-  //     if(queue[i] == 0){ 
-  //       queue[i] = id;
-  //       if(i == SENSOR_THRES - 1) 
-  //         full = true;
-  //     }
-  //   }
-  // }
+  for(i = 0; i < TOTAL_NODE * SENSOR_COUNT; i++){
+    if(sensData[i].temp > TEMP_THRES && 
+      sensData[i].humid < HUMID_THRES && 
+      sensData[i].moisture < MOIST_THRES
+    ){
+      for(i = 0; i < SENSOR_THRES; i++){
+        if(queue[i] == 0){ 
+          queue[i] = sensData[i].id - 1;
+          if(i == SENSOR_THRES){ 
+            for(i = 0; i < SENSOR_THRES; i++){
+              mavlink->add_waypoint(sensor_loc[queue[i]][0], sensor_loc[queue[i]][1]);
+              queue[i] = 0;
+            }
+            mavlink->send_mission();
+          }
+          return;
+        }
+      }
+      Serial.println("Queue is full!");
+    }
+  }
 }
 
 bool reconnect() {
@@ -163,64 +146,60 @@ bool reconnect() {
 
 void subscribe_cb(String& topic, String& payload) {
 
-  Serial.println("incoming: " + topic + " - " + payload);
+  // for debugging purposes
+  // Serial.println("incoming: " + topic + " - " + payload);
+  if(topic.equals("/drone/take_land")){
+    Serial.println("Takeoff and land manually is unsupported");
+    return;
+  }
 
-  // Serial.println("GPS settings detected");
-  // static uint8_t parser, key;
-  // static float coor;
-  // char* message = (char*)malloc(length + 1);
-  // memcpy(message, payload, length);
-  // message[length] = '\0';
-  // String tpc = String(topic);
-  // String msg = String(message);
-  // free(message);
-  // Serial.println(msg + " " + tpc);
-  // parser = tpc.indexOf('/');
-  // key = tpc.substring(0, parser).toInt();
-  // String val = String(tpc.substring(parser + 1, tpc.length()));
-  // coor = msg.toFloat();
-  // if(val.equals("latitude")){
-  //   sensor_loc[key - 1][0] = coor;
-  //   Serial.printf("Sensor %u latitude set to %f\n", key - 1, coor);
-  // }else if(val.equals("longitude")){
-  //   sensor_loc[key - 1][1] = coor;
-  //   Serial.printf("Sensor %u longitude set to %f\n", key - 1, coor);
-  // }else{
-  //   Serial.println("GPS setting invalid");
-  // }
-
-  // parse msg
+  static uint8_t parser, key;
+  static float coor;
+  parser = topic.lastIndexOf('/');
+  key = topic.substring(1, parser).toInt();
+  String val = String(topic.substring(parser + 1, topic.length()));
+  coor = payload.toFloat();
+  if(val.equals("latitude")){
+    sensor_loc[key - 1][0] = coor;
+    Serial.printf("Node %u latitude set to %f\n", key, coor);
+  }else if(val.equals("longitude")){
+    sensor_loc[key - 1][1] = coor;
+    Serial.printf("Node %u longitude set to %f\n", key, coor);
+  }
 }
 
 void publish_sensor_data(){
   if(!reconnect()) return; // use guard condition
   
   Serial.println("Publishing sensor data");
+
+  static std::array<int32_t, 2> home;
+  home = mavlink->get_home_pos_curr();
+  mqttClient.publish("/central/lat", (String(home[0])).c_str());
+  mqttClient.publish("/central/lng", (String(home[1])).c_str());
+
   mqttClient.publish("/central/temp", (String(bme.temperature)).c_str());
   mqttClient.publish("/central/press", (String(bme.pressure)).c_str());
   mqttClient.publish("/central/humid", (String(bme.humidity)).c_str());
   mqttClient.publish("/central/gas", (String(bme.gas_resistance)).c_str());
-  static std::array<float, 3> temp;
-  // temp = mavlink->get_global_pos_curr();
-  // mqttClient.publish("/drone/lat", String(temp[0]).c_str());
-  // mqttClient.publish("/drone/lng", String(temp[1]).c_str());
-  // mqttClient.publish("/drone/alt", String(temp[2]).c_str());
-  static std::array<int32_t, 3> pose = {-63648000, 1068245000, 5};    
+  static std::array<int32_t, 3> pose;
+  pose = mavlink->get_global_pos_curr();
   mqttClient.publish("/drone/lat", String(pose[0]).c_str());
   mqttClient.publish("/drone/lng", String(pose[1]).c_str());
   mqttClient.publish("/drone/alt", String(pose[2]).c_str());
-  pose[0] += 101; pose[1] += 101;    
-  temp = mavlink->get_velocity_curr();
-  mqttClient.publish("/drone/vx", String(temp[0]).c_str());
-  mqttClient.publish("/drone/vy", String(temp[1]).c_str());
-  mqttClient.publish("/drone/vz", String(temp[2]).c_str());
+  
+  static std::array<float, 3> vel;
+  vel = mavlink->get_velocity_curr();
+  mqttClient.publish("/drone/vx", String(vel[0]).c_str());
+  mqttClient.publish("/drone/vy", String(vel[1]).c_str());
+  mqttClient.publish("/drone/vz", String(vel[2]).c_str());
+
   mqttClient.publish("/drone/time", String(mavlink->get_time_boot()).c_str());
   mqttClient.publish("/drone/yaw_curr", String(mavlink->get_yaw_curr()).c_str());
   
   mqttClient.publish("/drone/progress", String(mavlink->get_mis_reached()).c_str()); 
   mqttClient.publish("/drone/battery", String(mavlink->get_battery_status()).c_str()); 
   mqttClient.publish("/drone/status", String((int)mavlink->get_armed()).c_str()); 
-  
 
   for(i = 1; i <= TOTAL_NODE * SENSOR_COUNT; i++){
     mqttClient.publish(("/" + String(i) + "/temp").c_str(), String(sensData[i - 1].temp).c_str());
@@ -233,20 +212,12 @@ void recieveMavlink() {
   mavlink->send_heartbeat();
 }
 
-void send_waypoints(){
-  if(mavlink->get_px_mode() != 0 && mavlink->get_px_status() != 0 && sent == false){
-    mavlink->set_fly_alt(3);
-    mavlink->add_waypoint(25.1599886, 60.9326207);
-    mavlink->add_waypoint(25.1599886, 60.9326209);
-    mavlink->send_mission();
-    sent = true;
-  }
-}
-
 void setup() {
   Serial.begin(115200);
 
   mavlink = std::make_shared<MAVLink>(57600, 16, 17); // Using UART2
+
+  mavlink->set_fly_alt(FLY_ALTITUDE);
 
   mesh.setDebugMsgTypes( ERROR | STARTUP | CONNECTION);  // set before init() so that you can see startup messages
 
@@ -269,39 +240,14 @@ void setup() {
   bme.setIIRFilterSize(BME680_FILTER_SIZE_3);
   bme.setGasHeater(320, 150); // 320*C for 150 ms
 
-  MQ131.setRegressionMethod(1);
-  MQ131.setA(23.943);
-  MQ131.setB(-1.11);
-  MQ131.init();
-
-  Serial.print("Calibrating gas sensor, please wait.");
-  float calcR0_131 = 0;
-  float calcR0_2 = 0;
-  for(i = 1; i<=10; i ++) {
-    MQ131.update();
-    calcR0_131 += MQ131.calibrate(RAT_MQ131_CA);
-    Serial.print(".");
-    delay(1);
-  }
-  Serial.println(".");
-  MQ131.setR0(calcR0_131/10);
-
-  Serial.println("Gas sensor calibration complete");
-
-  if(isinf(calcR0_131)) {Serial.println("Warning: Conection issue on MQ131, R0 is infinite (Open circuit detected) please check your wiring and supply");}
-  if(calcR0_131 == 0){Serial.println("Warning: Conection issue found on MQ131, R0 is zero (Analog pin shorts to ground) please check your wiring and supply");}
-  
   send_msg_task = std::make_shared<Task>(UPDATE_RATE, TASK_FOREVER, sendMsgRoutine);
   mavlink_task = std::make_shared<Task>(TASK_SECOND, TASK_FOREVER, recieveMavlink);
-  waypoint_task = std::make_shared<Task>(TASK_MILLISECOND * 5000, TASK_FOREVER, send_waypoints);
 
   mainscheduler.addTask(ConvTask::getFromShared(send_msg_task));
   mainscheduler.addTask(ConvTask::getFromShared(mavlink_task));
-  mainscheduler.addTask(ConvTask::getFromShared(waypoint_task));
 
   send_msg_task->enable();
   mavlink_task->enable();
-  waypoint_task->enable();
 
   mqttClient.begin(MQTT_BROKER, wifiClient);
   mqttClient.onMessage(subscribe_cb);
@@ -351,12 +297,15 @@ String packMsg(uint8_t idx) {
 
 void readSensorRoutine() {
   for (i = 0; i < SENSOR_COUNT; i++) {
+    // dummy data
+    // humid[i] = 30 + 2 * i;
+    // temp[i] = 30 + 2 * i;  
+    // moisture[i] = 30 + 2 * i; 
     humid[i] = dht[i]->getHumidity();
     temp[i] = dht[i]->getTemperature();  
-    moisture[i] = 32; // yl3869[i]->read();
-    Serial.printf("humid %f\n temperature %f", humid[i], temp[i]);
+    moisture[i] = yl3869[i]->read(); 
+    Serial.printf("Humid : %f\n Temperature %f Moisture : %f", humid[i], temp[i], moisture[i]);
   }
-re
   Serial.println("Sensor data read");
 
   if (mesh.isConnected(1)) Serial.println("Connected to central module. Sending");
@@ -412,13 +361,13 @@ void setup() {
   mesh.setDebugMsgTypes(ERROR | STARTUP | CONNECTION);  // set before init() so that you can see startup messages
   
   for(i = 0; i < SENSOR_COUNT; i++) {
-    sensor_id[i] = i+1;
+    sensor_id[i] = ((NODE_NUMBER - 1) * SENSOR_COUNT) + (i + 1);
     
     dht[i] = std::make_shared<DHTesp>(DHT_SENSOR_PINS[i], models::DHT11); // add define DHT models later
     dht[i]->begin();
     
-    // yl3869[i] = std::make_shared<YL3869>(MOIST_SENSOR_PINS[i]);
-    // yl3869[i]->init();
+    yl3869[i] = std::make_shared<YL3869>(MOIST_SENSOR_PINS[i]);
+    yl3869[i]->init();
   }
 
   send_msg_task = std::make_shared<Task>(TASK_MILLISECOND, TASK_ONCE, readSensorRoutine);
