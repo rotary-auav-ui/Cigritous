@@ -3,12 +3,12 @@
 If you want to flash central module code, use #define with CENTRAL_MODULE 
 If you want to flash node module code, use #define with NODE_MODULE and set the node number
 */
-#define CENTRAL_MODULE
-// #define NODE_MODULE 
+// #define CENTRAL_MODULE
+#define NODE_MODULE 
 
 // Please define node number sequentially starting from 1 (excluding central)
 #define NODE_NUMBER 1
-#define TOTAL_NODE  1  // Total number of all nodes excluding central module
+#define TOTAL_NODE  3  // Total number of all nodes excluding central module
 
 #define MESH_PREFIX     "Cigritous"
 #define MESH_PASSWORD   "Cigritous"

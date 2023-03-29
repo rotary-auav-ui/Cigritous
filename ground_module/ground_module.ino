@@ -267,7 +267,6 @@ void loop() {
 #else
 // === NODE MODULE SECTION SOURCE CODE ===
 
-#include <yl3869.h>
 #include "DHTesp.h"
 
 #include <memory>
@@ -283,7 +282,6 @@ painlessMesh mesh;
 std::shared_ptr<Task> send_msg_task;
 
 std::shared_ptr<DHTesp> dht[SENSOR_COUNT];
-std::shared_ptr<YL3869> yl3869[SENSOR_COUNT];
 
 float humid[SENSOR_COUNT], temp[SENSOR_COUNT];
 float moisture[SENSOR_COUNT];
@@ -304,17 +302,19 @@ void readSensorRoutine() {
     // humid[i] = 30 + 2 * i;
     // temp[i] = 30 + 2 * i;  
     // moisture[i] = 30 + 2 * i; 
-    humid[i] = dht[i]->getHumidity();
-    temp[i] = dht[i]->getTemperature();  
-    moisture[i] = yl3869[i]->read(); 
-    Serial.printf("Humid : %f\n Temperature %f Moisture : %f", humid[i], temp[i], moisture[i]);
+    for(int j = 0; j < 5; j++){
+      humid[i] = dht[i]->getHumidity();
+      temp[i] = dht[i]->getTemperature(); 
+      moisture[i] = analogRead(26) * 80.0 / 4096; 
+    }
+    Serial.printf("Humid : %f\nTemperature %f \nMoisture : %f %\n", humid[i], temp[i], moisture[i]);
   }
   Serial.println("Sensor data read");
 
   if (mesh.isConnected(1)) Serial.println("Connected to central module. Sending");
 
   i = 0;
-  send_msg_task->set(TASK_MILLISECOND, TASK_FOREVER, sendMsgRoutine);
+  sendMsgRoutine();
 }
 
 void sendMsgRoutine() {
@@ -368,12 +368,10 @@ void setup() {
     
     dht[i] = std::make_shared<DHTesp>(DHT_SENSOR_PINS[i], models::DHT11); // add define DHT models later
     dht[i]->begin();
-    
-    yl3869[i] = std::make_shared<YL3869>(MOIST_SENSOR_PINS[i]);
-    yl3869[i]->init();
+
   }
 
-  send_msg_task = std::make_shared<Task>(TASK_MILLISECOND, TASK_ONCE, readSensorRoutine);
+  send_msg_task = std::make_shared<Task>(TASK_SECOND, TASK_FOREVER, readSensorRoutine);
   
   mesh.init(MESH_PREFIX, MESH_PASSWORD, mainscheduler, MESH_PORT, WIFI_AP_STA, NODE_NUMBER, NETWORK_CHANNEL);  // node number can be changed from settings.h
   mesh.onReceive(&receivedCallback);
