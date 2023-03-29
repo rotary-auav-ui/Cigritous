@@ -119,7 +119,7 @@ void sendMsgRoutine() {
 bool reconnect() {
   // Loop until we're reconnected
   if(WiFi.status() != WL_CONNECTED) {
-    Serial.print("WiFi disconnected!");
+    Serial.println("WiFi disconnected!");
     return false;
   }
   if (!mqttClient.connected()) { // use if, not while so process not blocking
@@ -131,11 +131,14 @@ bool reconnect() {
       //Once connected, publish an announcement...
       mqttClient.publish("/hello", "Hello from central");
       // ... and resubscribe
-      mqttClient.subscribe("/1/latitude");
+      for(i = 1; i <= TOTAL_NODE * SENSOR_COUNT; i++){
+        mqttClient.subscribe("/" + String(i) + "/latitude");
+        mqttClient.subscribe("/" + String(i) + "/longitude");
+      }
       // mqttCsubscribe(MQTT_SERIAL_RECEIVER_CH);
       return true;
     } else {
-      Serial.print("failed, try again in 5 seconds");
+      Serial.println("failed, try again in 5 seconds");
       // Wait 5 seconds before retrying
       delay(5000);
       return false;
@@ -147,7 +150,7 @@ bool reconnect() {
 void subscribe_cb(String& topic, String& payload) {
 
   // for debugging purposes
-  // Serial.println("incoming: " + topic + " - " + payload);
+  Serial.println("incoming: " + topic + " - " + payload);
   if(topic.equals("/drone/take_land")){
     Serial.println("Takeoff and land manually is unsupported");
     return;
@@ -249,7 +252,7 @@ void setup() {
   send_msg_task->enable();
   mavlink_task->enable();
 
-  mqttClient.begin(MQTT_BROKER, wifiClient);
+  mqttClient.begin(MQTT_BROKER, MQTT_PORT, wifiClient);
   mqttClient.onMessage(subscribe_cb);
 }
 

@@ -13,7 +13,7 @@ If you want to flash node module code, use #define with NODE_MODULE and set the 
 #define MESH_PREFIX     "Cigritous"
 #define MESH_PASSWORD   "Cigritous"
 #define MESH_PORT       5555
-#define NETWORK_CHANNEL 6
+#define NETWORK_CHANNEL 13
 
 
 constexpr uint8_t DHT_SENSOR_PINS[1] = {25};
@@ -29,8 +29,8 @@ constexpr uint8_t SENSOR_COUNT = floor( (dht_sensor_count + moist_sensor_count) 
   #define MQTT_PASSWORD "CKvOQLxrtuqc"         
   #define MQTT_CLIENTID "ESP32Central"
   #define MQTT_PORT     18789
-  #define WIFI_SSID     "WIFI_SSID"
-  #define WIFI_PASSWORD "WIFI_PASSWORD;"
+  #define WIFI_SSID     "VTOL"
+  #define WIFI_PASSWORD "87654321"
   #define TEMP_THRES    35 // In Celsius (°C). How hot the air needs to be before watering
   #define HUMID_THRES   40 // In percentage. How dry the air needs to be before watering
   #define MOIST_THRES   40 // In percentage. How dry the soil needs to be before watering
