@@ -3,8 +3,7 @@
 import rclpy
 from rclpy.node import Node
 
-from module import CrowDetector
-from module import AruCoDetector
+import detector
 
 from px4_msgs.msg import TrajectorySetpoint, VehicleStatus
 from px4_msgs.msg import OffboardControlMode, VehicleCommand, VehicleOdometry
@@ -17,7 +16,7 @@ import threading
 
 import cv2
 
-class Vision(Node, CrowDetector, AruCoDetector):
+class Vision(Node):
 
     def __init__(self):
         super().__init__('vision')
@@ -25,22 +24,22 @@ class Vision(Node, CrowDetector, AruCoDetector):
         self.get_logger().info('Initiating precision landing program')
 
         # get param
-        self.loop_rate = self.declare_parameter('publish_rate', 20)
-        self.loop_time = 1/self.loop_rate
+        loop_rate = self.declare_parameter('publish_rate', 20).value
+        self.loop_time = 1/loop_rate
 
         mqtt_param = self.declare_parameters(
             namespace='mqtt',
             parameters=[
                 ('port', 5555),
-                ('broker', '0'),
+                ('broker', 'test.mqtt'),
                 ('username', 'a'),
                 ('password', 'a')
             ])
         
-        self.kp_vh = self.declare_parameter('precision_landing/kp', 0.1)
-        self.precland_radius = self.declare_parameter('precision_landing/radius', 50)
-        self.precland_height = self.declare_parameter('precision_landing/height', 50)
-
+        self.kp_vh = self.declare_parameter('precision_landing/kp', 0.1).value
+        self.precland_radius = self.declare_parameter('precision_landing/radius', 50).value
+        self.precland_height = self.declare_parameter('precision_landing/height', 50).value
+        
         self.precland_flag = False
         self.detcrow_flag = False
         
@@ -50,26 +49,27 @@ class Vision(Node, CrowDetector, AruCoDetector):
 
         _, frame = self.cap.read()
 
-        self.crow_detector = CrowDetector(frame)
+        self.crow_detector = detector.CrowML(frame)
 
-        self.aruco_detector = AruCoDetector(400)
+        self.aruco_detector = detector.AruCo(400)
 
         self.create_subscription(VehicleStatus, 'fmu/vehicle_status/out', self.cb_veh_sta, 10)
 
         self.veh_sta = VehicleStatus()
 
         self.pub_trj_set = self.create_publisher(
-            TrajectorySetpoint, 'fmu/trajectory_setpoint/in')
+            TrajectorySetpoint, 'fmu/trajectory_setpoint/in', 10)
         
         self.pub_ofb_mod = self.create_publisher(
-            OffboardControlMode, 'fmu/offboard_control_mode/in')
+            OffboardControlMode, 'fmu/offboard_control_mode/in', 10)
         
         self.pub_veh_cmd = self.create_publisher(
-            VehicleCommand, 'fmu/vehicle_command/in')
+            VehicleCommand, 'fmu/vehicle_command/in', 10)
         
-        self.timer_main = rclpy.Timer()
+        self.timer_main = self.create_timer(self.loop_time,
+                                            self.detect_crow_routine())
         self.timer_main.cancel() # turn off before starting
-        
+
         self.trj_set_msg = TrajectorySetpoint()
         self.ofb_mod_msg = OffboardControlMode()
         self.veh_cmd_msg = VehicleCommand()
@@ -80,8 +80,8 @@ class Vision(Node, CrowDetector, AruCoDetector):
         self.idle_counter = 0
 
         # init MQTT
-        self.mqttClient = mqtt.Client('navq-plus-1')
-        self.mqttClient.username_pw_set(mqtt_param[2], mqtt_param[3])
+        self.mqttClient = mqtt.Client('navq-plus')
+        #self.mqttClient.username_pw_set(mqtt_param[2], mqtt_param[3])
         
         # register callback
         self.mqttClient.on_connect = self.new_conn_callback
@@ -92,7 +92,7 @@ class Vision(Node, CrowDetector, AruCoDetector):
         threading.Thread(target=self.mqtt_loop, args=(mqtt_param, )).start()
         
     def mqtt_loop(self, mqtt_param):
-        self.mqttClient.connect(mqtt_param[1], mqtt_param[0])
+        self.mqttClient.connect(str(mqtt_param[1].value), mqtt_param[0].value)
         
         self.mqttClient.subscribe("drone/#")
 
@@ -122,11 +122,16 @@ class Vision(Node, CrowDetector, AruCoDetector):
     def detect_crow_routine(self):
         _, frame = self.cap.read()
         count, _, _ = self.crow_detector.detect(frame)
-        self.mqttClient.publish('/drone/crow_count', str(count))
+
+        self.get_logger().info("crow: %f" % count) # debug
+
+        self.mqttClient.publish('drone/crow_count', str(count))
         
     def precision_landing_routine(self):
         _, frame = self.cap.read()
         x, y = self.aruco_detector.detect(frame)
+        
+        self.get_logger().info("x: %f, y: %f" % (x, y)) # debug
         
         #self.trj_set_msg.timestamp = self.get_time_ms()
         #self.ofb_mod_msg.timestamp = self.trj_set_msg.timestamp
@@ -155,7 +160,7 @@ class Vision(Node, CrowDetector, AruCoDetector):
 
         if (prec_land_mode):
             self.pub_ofb_count = 0
-            self.timer_main = self.create_timer(int(1/self.loop_rate), 
+            self.timer_main = self.create_timer(self.loop_time, 
                                                 self.precland_flag_routine)
         else:
             self.timer_main.cancel()
@@ -179,6 +184,11 @@ class Vision(Node, CrowDetector, AruCoDetector):
         
         self.get_logger().info("Crow detection set to ", self.detcrow_flag)
         self.detcrow_flag = eval(msg.payload.decode())
+        if(self.detcrow_flag):
+            self.timer_main = self.create_timer(self.loop_time,
+                                                self.precland_flag_routine)
+        else:
+            self.timer_main.cancel()
 
 if __name__ == '__main__':
     rclpy.init(args=None)

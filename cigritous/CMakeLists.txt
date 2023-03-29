@@ -56,7 +56,7 @@ install(DIRECTORY config
 )
 
 # Install Python modules
-ament_python_install_package(module)
+ament_python_install_package(detector)
 
 install(PROGRAMS
   scripts/vision.py 
