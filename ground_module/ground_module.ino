@@ -296,17 +296,16 @@ String packMsg(uint8_t idx) {
   return (String(sensor_id[idx]) + "/" + String(humid[idx]) + "/" + String(temp[idx]) + "/" + String(moisture[idx]));
 }
 
+float readMoisture(uint8_t pin) {
+  return 100 - float(analogRead(pin)) * 80 / 4096;
+}
+
 void readSensorRoutine() {
   for (i = 0; i < SENSOR_COUNT; i++) {
     // dummy data
-    // humid[i] = 30 + 2 * i;
-    // temp[i] = 30 + 2 * i;  
-    // moisture[i] = 30 + 2 * i; 
-    for(int j = 0; j < 5; j++){
-      humid[i] = dht[i]->getHumidity();
-      temp[i] = dht[i]->getTemperature(); 
-      moisture[i] = analogRead(26) * 80.0 / 4096; 
-    }
+    humid[i] = dht[i]->getHumidity();
+    temp[i] = dht[i]->getTemperature(); 
+    moisture[i] = readMoisture(MOIST_SENSOR_PINS[i]); 
     Serial.printf("Humid : %f\nTemperature %f \nMoisture : %f %\n", humid[i], temp[i], moisture[i]);
   }
   Serial.println("Sensor data read");

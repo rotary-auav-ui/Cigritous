@@ -15,9 +15,8 @@ If you want to flash node module code, use #define with NODE_MODULE and set the 
 #define MESH_PORT       5555
 #define NETWORK_CHANNEL 13
 
-
 constexpr uint8_t DHT_SENSOR_PINS[1] = {25};
-constexpr uint8_t MOIST_SENSOR_PINS[1] = {26};
+constexpr uint8_t MOIST_SENSOR_PINS[1] = {34};
 
 constexpr uint8_t dht_sensor_count = sizeof(DHT_SENSOR_PINS)/sizeof(DHT_SENSOR_PINS[0]);
 constexpr uint8_t moist_sensor_count = sizeof(MOIST_SENSOR_PINS)/sizeof(MOIST_SENSOR_PINS[0]);
