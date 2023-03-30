@@ -94,24 +94,21 @@ void sendMsgRoutine() {
   publish_sensor_data();
 
   for(i = 0; i < TOTAL_NODE * SENSOR_COUNT; i++){
-    if(sensData[i].temp > TEMP_THRES && 
-      sensData[i].humid < HUMID_THRES && 
-      sensData[i].moisture < MOIST_THRES
-    ){
-      for(i = 0; i < SENSOR_THRES; i++){
-        if(queue[i] == 0){ 
-          queue[i] = sensData[i].id - 1;
-          if(i == SENSOR_THRES){ 
-            for(i = 0; i < SENSOR_THRES; i++){
-              mavlink->add_waypoint(sensor_loc[queue[i]][0], sensor_loc[queue[i]][1]);
-              queue[i] = 0;
+    if(sensData[i].moisture < MOIST_THRES){
+      for(int j = 0; j < SENSOR_THRES; j++){
+        if(queue[j] == 0){ 
+          queue[j] = sensData[j].id;
+          if(j == SENSOR_THRES - 1 && !full){ 
+          for(int k = 0; k < SENSOR_THRES; k++){
+              mavlink->add_waypoint(sensor_loc[queue[k] - 1][0], sensor_loc[queue[k] - 1][1]);
+              queue[k] = 0;
             }
             mavlink->send_mission();
           }
-          return;
         }
       }
       Serial.println("Queue is full!");
+      full = true;
     }
   }
 }
@@ -162,12 +159,14 @@ void subscribe_cb(String& topic, String& payload) {
   key = topic.substring(1, parser).toInt();
   String val = String(topic.substring(parser + 1, topic.length()));
   coor = payload.toFloat();
-  if(val.equals("latitude")){
-    sensor_loc[key - 1][0] = coor;
-    Serial.printf("Node %u latitude set to %f\n", key, coor);
-  }else if(val.equals("longitude")){
-    sensor_loc[key - 1][1] = coor;
-    Serial.printf("Node %u longitude set to %f\n", key, coor);
+  if(key > 1){
+    if(val.equals("latitude")){
+      sensor_loc[key - 2][0] = coor;
+      Serial.printf("Node %u latitude set to %f\n", key - 1, coor);
+    }else if(val.equals("longitude")){
+      sensor_loc[key - 2][1] = coor;
+      Serial.printf("Node %u longitude set to %f\n", key - 1, coor);
+    }
   }
 }
 
