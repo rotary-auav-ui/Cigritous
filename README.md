@@ -1,6 +1,8 @@
-# Welcome to Cigritous GROUND MODULE Branch!
+# Cigritous Ground Module Branch
 
-## ALERT: WIP/Work In Progress!
+# Installation
+
+[Click Here](https://github.com/rotary-auav-ui/cigritous/blob/ground-module/INSTALL.md)  
 
 ## Information
 
