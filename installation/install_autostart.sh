@@ -1,3 +1,4 @@
+#!/bin/bash
 sudo -S cp autoinstall/cigritous_autostart.sh /usr/local/bin/
 
 sudo -S chmod +x /usr/local/bin/cigritous_autostart.sh

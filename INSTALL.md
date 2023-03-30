@@ -11,7 +11,8 @@
 
 2. ROS2 Install
 
-**Note: ROS2 Foxy & Galactic has deprecated, but still working**
+Tested in 20.04 + ROS2 Foxy. Compiled but not tested in 22.04 + ROS2 Humble,
+**do it at your own risk!**
 
 **Install according to your Ubuntu version!**
 
@@ -23,17 +24,28 @@ Ubuntu 22.04 - Humble Hawksbill: https://docs.ros.org/en/humble/Installation.htm
 
 [PX4-ROS2 installation tutorial](https://docs.px4.io/main/en/ros/ros2_comm.html)
 
-4. Python Dependencies
+# Installation
+
+### Easy Setup!
+We've created the install script for easy setup, just download the `clean_setup.sh` then run it:
 
 ```bash
-pip3 install tflite-runtime opencv-python paho-mqtt
+wget https://github.com/rotary-auav-ui/cigritous/blob/main/cigritous/installation/clean_setup.sh
+
+chmod +x clean_setup.sh
+
+./clean_setup.sh
 ```
 
-# Installation
+And just wait until complete
+
+### Setup Commands
 
 Run these commands:
 
 ```bash
+
+pip3 install tflite-runtime opencv-python paho-mqtt pupil-apriltags
 
 cd ~/
 
@@ -45,10 +57,12 @@ mv cigritous src
 
 colcon build
 
-chmod +x demo.sh
+```
 
-./install_autostart.sh
+For autostart this program every boot:
 
+```bash
+/bin/bash ./install_autostart.sh
 ```
 
 **If submodule clone fails,**

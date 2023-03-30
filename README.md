@@ -23,8 +23,6 @@ For detailed concept, please read: [Crop Monitoring with Automated UAV Spray Res
 - M. Daffa Aryasetya (EE 25)
 - M. Fikri R. Abyadhi (EE 25)
 
-***Caution: Work In Progress***
-
 ## Branch Information
 
 ### Onboard Program Branch
