@@ -6,14 +6,12 @@ from rclpy.node import Node
 import detector
 
 from px4_msgs.msg import TrajectorySetpoint, VehicleStatus
-from px4_msgs.msg import OffboardControlMode, VehicleCommand, VehicleOdometry
+from px4_msgs.msg import OffboardControlMode, VehicleCommand
 
 import paho.mqtt.client as mqtt
-
 import math
-
+import numpy as np
 import threading
-
 import cv2
 
 class Vision(Node):
@@ -21,7 +19,7 @@ class Vision(Node):
     def __init__(self):
         super().__init__('vision')
 
-        self.get_logger().info('Initiating precision landing program')
+        self.get_logger().info('Initiating vision program')
 
         # get param
         loop_rate = self.declare_parameter('publish_rate', 20).value
@@ -30,28 +28,50 @@ class Vision(Node):
         mqtt_param = self.declare_parameters(
             namespace='mqtt',
             parameters=[
-                ('port', 5555),
-                ('broker', 'test.mqtt'),
-                ('username', 'a'),
-                ('password', 'a')
+                ('port', 18789),
+                ('broker', 'driver.cloudmqtt.com')
             ])
         
         self.kp_vh = self.declare_parameter('precision_landing/kp', 0.1).value
         self.precland_radius = self.declare_parameter('precision_landing/radius', 50).value
         self.precland_height = self.declare_parameter('precision_landing/height', 50).value
+
+        crowdet_param = self.declare_parameters(
+            namespace='object_detection',
+            parameters=[
+                ('model_name', 'crow-int8.tflite'),
+                ('confidence_threshold', 0.25),
+                ('iou_threshold', 0.45)
+            ])
+        
+        capture_param = self.declare_parameters(
+            namespace='camera',
+            parameters=[
+                ('width_capture', 640),
+                ('height_capture', 480),
+                ('framerate', 30)
+            ])
         
         self.precland_flag = False
         self.detcrow_flag = False
         
         # start OpenCV things
-        self.cap = cv2.VideoCapture('v4l2src device=/dev/video3 ! video/x-raw,framerate=30/1,width=640,height=480 ! appsink', 
-                               cv2.CAP_GSTREAMER)
+        framerate = f'framerate={capture_param[2].value}/1'
+        resolution = f'width={capture_param[0].value},height={capture_param[1].value}'
+        video_capture_command = 'v4l2src device=/dev/video3 ! video/x-raw,' + framerate + ',' + resolution
+        video_capture_command = video_capture_command + ' ! appsink'
+        
+        # capture from video
+        self.cap = cv2.VideoCapture(video_capture_command, cv2.CAP_GSTREAMER)
+        
+        # image detecting for debug purposes
+        #frame = cv2.imread('/home/rizkymille/cigritous_ws/src/docs/apriltags/apriltag36h11.png')
 
-        _, frame = self.cap.read()
+        self.crow_detector = detector.CrowML(crowdet_param[0].value, 
+                                             crowdet_param[1].value, 
+                                             crowdet_param[2].value)
 
-        self.crow_detector = detector.CrowML(frame)
-
-        self.aruco_detector = detector.AruCo(400)
+        self.apriltags_detector = detector.AprilTags(400)
 
         self.create_subscription(VehicleStatus, 'fmu/vehicle_status/out', self.cb_veh_sta, 10)
 
@@ -65,10 +85,6 @@ class Vision(Node):
         
         self.pub_veh_cmd = self.create_publisher(
             VehicleCommand, 'fmu/vehicle_command/in', 10)
-        
-        self.timer_main = self.create_timer(self.loop_time,
-                                            self.detect_crow_routine())
-        self.timer_main.cancel() # turn off before starting
 
         self.trj_set_msg = TrajectorySetpoint()
         self.ofb_mod_msg = OffboardControlMode()
@@ -80,29 +96,31 @@ class Vision(Node):
         self.idle_counter = 0
 
         # init MQTT
-        self.mqttClient = mqtt.Client('navq-plus')
-        #self.mqttClient.username_pw_set(mqtt_param[2], mqtt_param[3])
+        self.MQTTClient = mqtt.Client('navq-plus')
         
         # register callback
-        self.mqttClient.on_connect = self.new_conn_callback
-        self.mqttClient.message_callback_add("drone/flag/precision_landing", self.flag_precland_callback)
-        self.mqttClient.message_callback_add("drone/flag/detect_crow", self.flag_detcrow_callback)
+        self.MQTTClient.on_connect = self.new_conn_callback
+        self.MQTTClient.message_callback_add("drone/flag/precision_landing", self.flag_precland_callback)
+        self.MQTTClient.message_callback_add("drone/flag/detect_crow", self.flag_detcrow_callback)
 
         # connect & subs MQTT in new thread
         threading.Thread(target=self.mqtt_loop, args=(mqtt_param, )).start()
+
+        self.timer_main = self.create_timer(self.loop_time,
+                                            self.detect_crow_routine())
+        self.timer_main.cancel() # turn off before starting
         
     def mqtt_loop(self, mqtt_param):
-        self.mqttClient.connect(str(mqtt_param[1].value), mqtt_param[0].value)
+        self.get_logger().info("%s %d" % (mqtt_param[1].value, mqtt_param[0].value))
+        self.MQTTClient.connect(str(mqtt_param[1].value), mqtt_param[0].value)
         
-        self.mqttClient.subscribe("drone/#")
+        self.MQTTClient.subscribe("drone/#")
 
-        self.mqttClient.loop_forever()
+        self.MQTTClient.loop_forever()
 
 
-    '''
     def get_time_ms(self):
         return int(self.get_clock().now().nanoseconds/1e3)
-    '''
 
     def set_vehicle_command(self, cmd, para1 = None, para2 = None):
         if (self.veh_cmd_msg.command == cmd):
@@ -121,17 +139,23 @@ class Vision(Node):
 
     def detect_crow_routine(self):
         _, frame = self.cap.read()
-        count, _, _ = self.crow_detector.detect(frame)
+        start = self.get_time_ms()
+        count = self.crow_detector.detect(frame)
+        self.get_logger().info("inference time: %.1fs" % ((self.get_time_ms() - start)/1e3))
 
-        self.get_logger().info("crow: %f" % count) # debug
+        self.get_logger().info("crow: %d" % count) # debug
 
-        self.mqttClient.publish('drone/crow_count', str(count))
+        self.MQTTClient.publish('drone/crow_count', str(count))
         
     def precision_landing_routine(self):
         _, frame = self.cap.read()
-        x, y = self.aruco_detector.detect(frame)
+        x, y = self.apriltags_detector.detect(frame)
         
-        self.get_logger().info("x: %f, y: %f" % (x, y)) # debug
+        self.get_logger().info("x: %d, y: %d" % (x, y)) # debug
+        
+        if (x == np.nan):
+            self.get_logger().info("no target") # debug
+            return
         
         #self.trj_set_msg.timestamp = self.get_time_ms()
         #self.ofb_mod_msg.timestamp = self.trj_set_msg.timestamp
@@ -152,6 +176,10 @@ class Vision(Node):
         self.pub_trj_set.publish(self.trj_set_msg)
         self.pub_ofb_mod.publish(self.ofb_mod_msg)
 
+        if not self.arming_state:
+            self.timer_main = self.create_timer(self.loop_time,
+                                            self.detect_crow_routine())
+
     def cb_veh_sta(self, msg):
         self.veh_sta = msg
 
@@ -161,7 +189,7 @@ class Vision(Node):
         if (prec_land_mode):
             self.pub_ofb_count = 0
             self.timer_main = self.create_timer(self.loop_time, 
-                                                self.precland_flag_routine)
+                                                self.precland_flag_routine())
         else:
             self.timer_main.cancel()
 
@@ -169,7 +197,7 @@ class Vision(Node):
         if rc == 0:
             self.get_logger().info("MQTT broker connect success")
         else:
-            self.get_logger().warn("MQTT broker connect failed with %d", rc)
+            self.get_logger().warn("MQTT broker connect failed with %d" % rc)
 
     def flag_precland_callback(self, client, userdata, msg):
         if (self.precland_flag == eval(msg.payload.decode())):
@@ -186,7 +214,7 @@ class Vision(Node):
         self.detcrow_flag = eval(msg.payload.decode())
         if(self.detcrow_flag):
             self.timer_main = self.create_timer(self.loop_time,
-                                                self.precland_flag_routine)
+                                                self.precland_flag_routine())
         else:
             self.timer_main.cancel()
 
