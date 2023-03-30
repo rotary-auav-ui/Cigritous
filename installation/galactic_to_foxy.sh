@@ -4,7 +4,6 @@ sudo -S cp /etc/skel/.bashrc ~/.bashrc
 
 source ~/.bashrc
 
-echo "Detecting ROS2 Galactic. Uninstalling..."
 sudo -S apt -y remove ~nros-galactic-* && sudo apt -y autoremove
 
 sudo -S apt -y update
