@@ -173,6 +173,12 @@ void subscribe_cb(char* topic, byte *payload, unsigned int length) {
   }
 }
 
+void subscribe_data(){
+  if
+  (reconnect(){
+    
+  })
+}
 void publish_data(){
   if(reconnect()){
     Serial.println("Publishing data");

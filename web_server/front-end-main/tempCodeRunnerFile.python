@@ -1,0 +1,18 @@
+v = int(input("Enter a value for v: "))
+A = [31, 41, 49, 26, 41, 58]
+
+while True:
+    for i in range(6):
+        if A[i] == v:
+            print(i+1)
+            break
+        if i == 5:
+            print("NIL")
+    
+    choice = int(input("Enter 1 to continue or 0 to quit: "))
+    if choice == 1:
+        v = int(input("Enter a value for v: "))
+    elif choice == 0:
+        break
+    else:
+        print("Invalid choice. Please enter 1 to continue or 0 to quit.")

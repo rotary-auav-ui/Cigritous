@@ -27,8 +27,8 @@ constexpr uint8_t SENSOR_COUNT = floor( (dht_sensor_count + moist_sensor_count) 
   #define MQTT_USERNAME "cbobzrgp"
   #define MQTT_PASSWORD "CKvOQLxrtuqc"
   #define MQTT_PORT     18789
-  #define WIFI_SSID     "JuanJonathan"
-  #define WIFI_PASSWORD "123juan123;'"
+  #define WIFI_SSID     "VTOL"
+  #define WIFI_PASSWORD "87654321"
   #define SENSOR_THRES  3 
   #define TEMP_THRES    35
   #define HUMID_THRES   40
