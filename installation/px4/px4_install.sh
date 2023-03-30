@@ -2,7 +2,7 @@
 
 echo "Installing PX4-ROS2 environment"
 
-sudo apt-get install openjdk-11-jre
+sudo -S apt-get install -y openjdk-11-jre
 
 cd ~/
 

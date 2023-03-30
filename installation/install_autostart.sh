@@ -8,3 +8,5 @@ sudo -S cp autoinstall/cigritous.service /etc/systemd/system/
 sudo systemctl start cigritous.service
 sudo systemctl status cigritous.service
 sudo systemctl enable cigritous.service
+
+echo "Autostart install completed"
