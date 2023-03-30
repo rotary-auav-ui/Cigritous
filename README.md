@@ -2,7 +2,7 @@
 
 !['cigritous logo'](https://github.com/rotary-auav-ui/cigritous/blob/main/docs/project_logo.png)  
 
-Cigritous is a NXP Hovergames 3 project by **Vishwakarma Aerial Dexterity Research Group Universitas Indonesia** for reducing yield losses from pests and weather. 
+Cigritous is a NXP Hovergames 3 project by *Vishwakarma Aerial Dexterity Research Group Universitas Indonesia* **for reducing yield losses from pests and weather by utilizing automated drone responder and remote monitoring system.** 
 
 For detailed concept, please read: [Crop Monitoring with Automated UAV Spray Response](https://www.hackster.io/contests/nxp-hovergames-challenge-3/hardware_applications/15385)
 
@@ -35,6 +35,7 @@ Hardware:
 
 - NXP Vehicle Drone Kit (RDDRONE-FMUK66)
 - NXP i.MX 8M Plus based 8M NavQ Plus Computer
+- Google Coral 5MP
 
 Software:
 
@@ -51,13 +52,12 @@ Software:
 
 Branch for sensor network or ground module programs. Contains *sensor nodes* source codes and libraries.
 
-The sensor network has 2 main part: **central** and **node**. The nodes are connected together by mesh and connected to sensors to sample ground data. Sampled data will be sent to central, which acts as 'back end' and communicating to onboard computer and FCU via TCP & MAVLink 
+The sensor network has 2 main part: **central** and **node**. The nodes are connected together by mesh and connected to sensors to sample ground data. Sampled data will be sent to central, which acts as 'back end' and communicating to onboard computer and FCU via TCP & MAVLink.
 
 Hardware:
 
 - Bosch Sensortec Environmental Gas Sensor BME688
 - ESP32 DevKit
-- MQ131 Ozone Sensor
 - YL-38/69 Moisture Sensor
 - DHT22 Humidity and Temperature Sensor
 
@@ -74,13 +74,13 @@ Software:
   - Bosch BME68x library
 
 #### Installation and Usage
-[Click Here](https://github.com/rotary-auav-ui/cigritous/blob/ground-module/INSTALL.md)  
+[Read Me!](https://github.com/rotary-auav-ui/cigritous/blob/ground-module/README.md)  
 
 ### Web Server Branch
 
 *`webserver`*
 
-Branch for webserver front end. Acts as Web-based Ground Control Station which display agriculture and drone data from sensor network. The system is backend-less because direct sensor network communication using MQTT. Tested in Heroku
+Branch for webserver front end. Acts as Web-based Ground Control Station which display agriculture and drone data from sensor network. **The system is backend-less because direct sensor network communication using MQTT**. *Tested in Heroku*.
 
-#### Installation
-[Web Server Install](https://github.com/rotary-auav-ui/cigritous/blob/webserver/INSTALL.md)  
+#### Installation and Usage
+[Read Me!](https://github.com/rotary-auav-ui/cigritous/blob/webserver/README.md)  
