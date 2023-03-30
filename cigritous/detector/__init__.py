@@ -1,2 +1,2 @@
-from .AruCo import AruCo
+from .AprilTags import AprilTags
 from .CrowML import CrowML
