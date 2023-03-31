@@ -710,9 +710,9 @@ const Home = () => {
 
           <MDBContainer>
             <LineChartCentral title={"Line Chart Central"} />
-            {nodes.slice(0, titik).map((node, index) => (
+            {nodes.slice(1, titik).map((node, index) => (
               <>
-                <LineChartNode title={`Line Chart Node ${index + 1}`} node={index + 1} />
+                <LineChartNode title={`Line Chart Node ${index + 2}`} node={index + 2} />
               </>
             ))}
           </MDBContainer>

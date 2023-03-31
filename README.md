@@ -1,3 +1,48 @@
+# Website Cigritous
+
+This website is a platform that is useful for monitoring and controlling drones in performing their tasks. This website consists of 3 pages, namely the dashboard page, about page, and control page. This website is connected to MQTT as communication for ESP and PostgreSQL for DBMS.
+
+You can see the results of the finished website by clicking the following link:
+Kunjungi profil saya di [Cigritous.tech](https://www.cigritous.tech/)
+
+---
+
+## Dashboard Page
+
+Useful for determining many nodes, monitoring the position of the drone in real time, monitoring various available parameters such as temperature, humidity, moisture, and others. On this page there is also a record graph that is useful for viewing the history of the state of plant nodes.
+
+![Gambar Dashboard](https://cdn.discordapp.com/attachments/1048974551440179331/1091336616200642600/image.png)
+
+![Gambar Dashboard](https://cdn.discordapp.com/attachments/1048974551440179331/1091336883751112764/image.png)
+
+![Gambar Dashboard](https://cdn.discordapp.com/attachments/1048974551440179331/1091348467907051570/image.png)
+
+![Gambar Dashboard](https://cdn.discordapp.com/attachments/1048974551440179331/1091349327412203560/image.png)
+
+## ![Gambar Dashboard](https://cdn.discordapp.com/attachments/1048974551440179331/1091355107066646649/image.png)
+
+---
+
+## About page
+
+This page contains some documentation of the drone at work and the background of the cigritous project.
+
+![Gambar Dashboard](https://cdn.discordapp.com/attachments/1048974551440179331/1091340569759981648/image.png)
+
+---
+
+## Controls page
+
+On this page the user can perform an activity related to the drone such as, take off, landing, and activate the crow detection mode. On this page users can also see the status of the drone such as drone status, battery status, drone location, drone speed, and others.
+
+![Gambar Dashboard](https://cdn.discordapp.com/attachments/1048974551440179331/1091340431486361600/image.png)
+
+![Gambar Dashboard](https://cdn.discordapp.com/attachments/1048974551440179331/1091344335678750821/image.png)
+
+![Gambar Dashboard](https://cdn.discordapp.com/attachments/1048974551440179331/1091344447054282843/image.png)
+
+---
+
 ## For Front End
 
 In the project directory, you can run:
