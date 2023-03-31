@@ -2,7 +2,6 @@ import cv2
 import numpy as np
 import tflite_runtime.interpreter as tflite
 import os
-import imutils
 
 class CrowML():
     def __init__(self, model_name, conf_thres, iou_thres):
