@@ -5,13 +5,12 @@ from rclpy.node import Node
 
 import detector
 
-from px4_msgs.msg import TrajectorySetpoint, VehicleStatus
+from px4_msgs.msg import TrajectorySetpoint, VehicleStatus, VehicleControlMode
 from px4_msgs.msg import OffboardControlMode, VehicleCommand
 
 import paho.mqtt.client as mqtt
 import math
 import numpy as np
-import threading
 import cv2
 
 class Vision(Node):
@@ -50,7 +49,7 @@ class Vision(Node):
         # ==== END OF PARAMETERS SECTION ====
         
         self.precland_flag = False
-        self.detcrow_flag = False
+        self.detcrow_flag = True
         
         # start OpenCV things
         framerate = f'framerate={capture_param["framerate"]}/1'
@@ -69,11 +68,13 @@ class Vision(Node):
                                              crowdet_param["confidence_threshold"], 
                                              crowdet_param["iou_threshold"])
 
-        self.apriltags_detector = detector.AprilTags(400)
+        self.apriltags_detector = detector.AprilTags(250)
 
         self.create_subscription(VehicleStatus, 'fmu/vehicle_status/out', self.cb_veh_sta, 10)
+        self.create_subscription(VehicleControlMode, 'fmu/vehicle_control_mode/out', self.cb_veh_ctl_mod, 10)
 
         self.veh_sta = VehicleStatus()
+        self.veh_ctl_mod = VehicleControlMode()
 
         self.pub_trj_set = self.create_publisher(
             TrajectorySetpoint, 'fmu/trajectory_setpoint/in', 10)
@@ -118,15 +119,20 @@ class Vision(Node):
 
         self.timer_crow = self.create_timer(self.loop_time,
                                             self.detect_crow_routine)
-        #self.timer_crow.cancel()
+        self.timer_crow.cancel()
         
         self.timer_precland = self.create_timer(self.loop_time,
                                                 self.precision_landing_routine)
-        #self.timer_precland.cancel()
+        self.timer_precland.cancel()
         self.get_logger().info("Program vision initialized")
         
     def mqtt_loop(self):        
         self.MQTTClient.loop_start()
+
+        if (self.detcrow_flag and self.timer_crow.is_canceled()):
+            self.timer_crow.reset()
+        elif (not self.detcrow_flag):
+            self.timer_crow.cancel()
 
     def get_time_ms(self):
         return int(self.get_clock().now().nanoseconds/1e3)
@@ -159,12 +165,12 @@ class Vision(Node):
     def precision_landing_routine(self):
         _, frame = self.cap.read()
         x, y = self.apriltags_detector.detect(frame)
-        
-        self.get_logger().info("x: %d, y: %d" % (x, y)) # debug
-        
+
         if (x == np.nan):
             self.get_logger().info("no target") # debug
             return
+        else:
+            self.get_logger().info("x: %d, y: %d" % (x, y)) # debug
         
         #self.trj_set_msg.timestamp = self.get_time_ms()
         #self.ofb_mod_msg.timestamp = self.trj_set_msg.timestamp
@@ -185,23 +191,21 @@ class Vision(Node):
         self.pub_trj_set.publish(self.trj_set_msg)
         self.pub_ofb_mod.publish(self.ofb_mod_msg)
 
-        if not self.veh_sta.arming_state:
-            self.timer_main = self.create_timer(self.loop_time,
-                                            self.detect_crow_routine)
-
     def cb_veh_sta(self, msg):
         self.veh_sta = msg
 
-        prec_land_mode = self.veh_sta.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LAND 
-        prec_land_mode = prec_land_mode and self.timer_main.is_canceled() and self.precland_flag
+        prec_land_start = self.veh_sta.failsafe and self.precland_flag
 
-        if (prec_land_mode):
+        if (prec_land_start and self.timer_precland.is_canceled()):
             self.pub_ofb_count = 0
             self.timer_crow.cancel()
-            self.timer_precland = self.create_timer(self.loop_time, 
-                                                self.precision_landing_routine)
-        else:
+            self.timer_precland.reset()
+        elif (prec_land_start and (not self.veh_ctl_mod) and (self.timer_crow.is_canceled())):
             self.timer_precland.cancel()
+            self.timer_crow.reset()
+
+    def cb_veh_ctl_mod(self, msg):
+        self.veh_ctl_mod = msg
 
     def new_conn_callback(self, client, userdata, flags, rc):
         if rc == 0:
@@ -212,12 +216,6 @@ class Vision(Node):
     def flag_precland_callback(self, client, userdata, msg):
         self.precland_flag == eval(msg.payload.decode())
         self.get_logger().info("Precision landing set to ", self.precland_flag)
-        if self.precland_flag:
-            self.timer_precland.cancel()
-            self.timer_crow = self.create_timer(self.loop_time, 
-                                                self.precision_landing_routine)
-        else:
-            self.timer_crow.cancel()
 
     def flag_detcrow_callback(self, client, userdata, msg):
         self.detcrow_flag == eval(msg.payload.decode())

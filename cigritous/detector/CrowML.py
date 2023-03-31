@@ -9,14 +9,14 @@ class CrowML():
         # init tflite
         os.environ['USE_GPU_INFERENCE'] = "0"
 
-        #ext_delegate_path = '/lib/libvx_delegate.so'
+        ext_delegate_path = '/lib/libvx_delegate.so'
 
         dir_path = os.path.dirname(os.path.realpath(__file__))
                 
-        #delegate = tflite.load_delegate(ext_delegate_path)
+        delegate = tflite.load_delegate(ext_delegate_path)
 
-        self.interpreter = tflite.Interpreter(model_path=os.path.join(dir_path, model_name))#,
-                                              #experimental_delegates=[delegate])
+        self.interpreter = tflite.Interpreter(model_path=os.path.join(dir_path, model_name),
+                                              experimental_delegates=[delegate])
 
         self.interpreter.allocate_tensors()
 
