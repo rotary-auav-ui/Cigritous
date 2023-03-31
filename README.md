@@ -4,7 +4,7 @@
 
 Cigritous is a NXP Hovergames 3 project by *Vishwakarma Aerial Dexterity Research Group Universitas Indonesia* **for reducing yield losses from pests and weather by utilizing automated drone responder and remote monitoring system.** 
 
-For detailed concept, please read: [Crop Monitoring with Automated UAV Spray Response](https://www.hackster.io/contests/nxp-hovergames-challenge-3/hardware_applications/15385)
+For detailed concept, please read: [Crop Monitoring with Automated UAV Spray Response](https://www.hackster.io/vishwakarma/cigritous-crop-monitoring-with-automated-uav-spray-response-473d80#toc-system-description-4)
 
 ## Authors
 - Thariq Hadyan (Electrical Engineering 23)
@@ -49,6 +49,7 @@ Software:
 #### Detection Performance using NXP NavQ+
 !['crow detected'](https://github.com/rotary-auav-ui/cigritous/blob/main/docs/detection.png)  
 
+Model: Quantized INT8 YOLOv5
 Average detection time: 2800ms or 2.8s 
 !['detection time'](https://github.com/rotary-auav-ui/cigritous/blob/main/docs/detection.png)  
 
