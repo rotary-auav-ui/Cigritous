@@ -15,7 +15,7 @@ class AprilTags():
 
         results = self.detector.detect(frame)
 
-        xy = np.zeros(2)
+        xy = np.array([np.nan, np.nan])
 
         for r in results:
             '''
