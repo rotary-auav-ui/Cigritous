@@ -2,8 +2,7 @@
 
 This website is a platform that is useful for monitoring and controlling drones in performing their tasks. This website consists of 3 pages, namely the dashboard page, about page, and control page. This website is connected to MQTT as communication for ESP and PostgreSQL for DBMS.
 
-You can see the results of the finished website by clicking the following link:
-Kunjungi profil saya di [Cigritous.tech](https://www.cigritous.tech/)
+You can see the results of the finished website by clicking the following link: [Cigritous.tech](https://www.cigritous.tech/)
 
 ---
 
