@@ -59,7 +59,7 @@ install(DIRECTORY config
 ament_python_install_package(detector)
 
 install(PROGRAMS
-  scripts/vision.py 
+  scripts/program_vision.py 
   DESTINATION lib/${PROJECT_NAME}
 )
 
