@@ -47,11 +47,11 @@ Software:
 [Click Here](https://github.com/rotary-auav-ui/cigritous/blob/main/INSTALL.md)  
 
 #### Detection Performance using NXP NavQ+
-!['crow detected'](https://github.com/rotary-auav-ui/cigritous/blob/main/docs/detection.png)  
+!['crow detected'](https://github.com/rotary-auav-ui/cigritous/blob/main/docs/detection.jpg)  
 
 Model: Quantized INT8 YOLOv5
 Average detection time: 2800ms or 2.8s 
-!['detection time'](https://github.com/rotary-auav-ui/cigritous/blob/main/docs/detection.png)  
+!['inference performance'](https://github.com/rotary-auav-ui/cigritous/blob/main/docs/inference_performance.png)  
 
 ### Sensor Network / Ground Module Branch
 
