@@ -1,6 +1,6 @@
 # Welcome to Cigritous Repository!
 
-!['cigritous logo'](https://github.com/rotary-auav-ui/cigritous/blob/main/docs/project_logo.png)  
+!['cigritous logo'](https://github.com/rotary-auav-ui/cigritous/blob/main/docs/new_project_logo.png)  
 
 Cigritous is a NXP Hovergames 3 project by *Vishwakarma Aerial Dexterity Research Group Universitas Indonesia* **for reducing yield losses from pests and weather by utilizing automated drone responder and remote monitoring system.** 
 
