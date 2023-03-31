@@ -7,21 +7,21 @@ Cigritous is a NXP Hovergames 3 project by *Vishwakarma Aerial Dexterity Researc
 For detailed concept, please read: [Crop Monitoring with Automated UAV Spray Response](https://www.hackster.io/contests/nxp-hovergames-challenge-3/hardware_applications/15385)
 
 ## Authors
-- Thariq Hadyan (EE 23)
-- Benedicto Matthew W. (CE 24)
-- Raihan Syahran (EE 23)
-- Abdul Fikih K. (CE 25)
-- M. Rizky Millennianno (Phys 23)
-- Dylan Vieri (EE 25)
-- Ricky Iskandar Z. (Phys 24)
-- Lauren Christy T. (CE 25)
-- Juan Jonathan (CE 25)
-- Muhammad Fikri (ME 24)
-- Andre Christoga P. (Phys 24)
-- Ahmad Rifqi (CE 25)
-- Adrian Leo P. (EE 25)
-- M. Daffa Aryasetya (EE 25)
-- M. Fikri R. Abyadhi (EE 25)
+- Thariq Hadyan (Electrical Engineering 23)
+- Benedicto Matthew W. (Computer Engineering 24)
+- Raihan Syahran (Electrical Engineering 23)
+- Abdul Fikih K. (Computer Engineering 25)
+- M. Rizky Millennianno (Physics 23)
+- Dylan Vieri (Computer Engineering 25)
+- Ricky Iskandar Z. (Physics 24)
+- Lauren Christy T. (Computer Engineering 25)
+- Juan Jonathan (Computer Engineering 25)
+- Muhammad Fikri (Mechanical Engineering 24)
+- Andre Christoga P. (Physics 24)
+- Ahmad Rifqi (Computer Engineering 25)
+- Adrian Leo P. (Electrical Engineering 25)
+- M. Daffa Aryasetya (Electrical Engineering 25)
+- M. Fikri R. Abyadhi (Electrical Engineering 25)
 
 ## Branch Information
 
@@ -29,19 +29,19 @@ For detailed concept, please read: [Crop Monitoring with Automated UAV Spray Res
 
 *`main`*
 
-Branch for drone computer programs. Contains drone *visual-inertial program*, *pest detector*, and *precision landing*
+Branch for drone computer programs. Contains drone *visual-inertial*, *pest detector*, and *precision landing* program
 
 Hardware:
 
 - NXP Vehicle Drone Kit (RDDRONE-FMUK66)
 - NXP i.MX 8M Plus based 8M NavQ Plus Computer
-- Google Coral 5MP
+- Google Coral 5MP Camera
 
 Software:
 
-- Linux Ubuntu 22.04 LTS Jammy Jellyfish / 20.04 LTS Focal Fossa
-- ROS2 Humble Hawksbill / Foxy Fitzroy
-- PX4-Autopilot v1.13.2
+- Linux Ubuntu 20.04 LTS Focal Fossa / 22.04 LTS Jammy Jellyfish
+- ROS2 Foxy Fitzroy / Humble Hawksbill
+- PX4-Autopilot v1.13.3
 
 #### Installation and Usage
 [Click Here](https://github.com/rotary-auav-ui/cigritous/blob/main/INSTALL.md)  
@@ -70,7 +70,7 @@ Software:
   - DHTesp
   - YL3869
   - MQUnifiedsensors
-  - MQTT library
+  - arduino-mqtt
   - Bosch BME68x library
 
 #### Installation and Usage
@@ -78,7 +78,7 @@ Software:
 
 ### Web Server Branch
 
-*`web-server`*
+*`web_server`*
 
 Branch for webserver front end. Acts as Web-based Ground Control Station which display agriculture and drone data from sensor network. **The system is backend-less because direct sensor network communication using MQTT**. *Tested in Heroku*.
 
