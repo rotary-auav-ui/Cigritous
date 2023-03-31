@@ -45,7 +45,11 @@ Run these commands:
 
 ```bash
 
-pip3 install tflite-runtime opencv-python paho-mqtt pupil-apriltags
+pip3 install tflite-runtime opencv-python paho-mqtt 
+
+pip3 install pep517
+
+pip3 install pupil-apriltags
 
 cd ~/
 
