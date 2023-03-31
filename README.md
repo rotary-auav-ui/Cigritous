@@ -83,4 +83,4 @@ Software:
 Branch for webserver front end. Acts as Web-based Ground Control Station which display agriculture and drone data from sensor network. **The system is backend-less because direct sensor network communication using MQTT**. *Tested in Heroku*.
 
 #### Installation and Usage
-[Read Me!](https://github.com/rotary-auav-ui/cigritous/blob/web-server/README.md)  
+[Read Me!](https://github.com/rotary-auav-ui/cigritous/blob/web_server/README.md)  
