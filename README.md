@@ -8,7 +8,7 @@ You can see the results of the finished website by clicking the following link: 
 
 # Installation In Local
 
-In the installation section, because this web is built on Node JS. So you must install Node JS first to run this website on your local computer.
+In the installation section, because this web is built on Node JS. So you must install Node JS first to run this website on your local computer And if you want to run this web normally for your personal gain, you must have MQTT for communication to ESP and PostgreSQL for Database. then, appropriate in this code like enviroment variabel and etc.
 
 Install Node JS: [Node JS](https://nodejs.org/en/download)
 
