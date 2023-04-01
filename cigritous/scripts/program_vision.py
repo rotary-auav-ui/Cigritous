@@ -68,10 +68,15 @@ class Vision(Node):
                                              crowdet_param["confidence_threshold"], 
                                              crowdet_param["iou_threshold"])
 
-        self.apriltags_detector = detector.AprilTags(250)
+        self.apriltags_detector = detector.AprilTags(200)
 
-        self.create_subscription(VehicleStatus, 'fmu/vehicle_status/out', self.cb_veh_sta, 10)
-        self.create_subscription(VehicleControlMode, 'fmu/vehicle_control_mode/out', self.cb_veh_ctl_mod, 10)
+        group1 = rclpy.callback_groups.MutuallyExclusiveCallbackGroup()
+        group2 = rclpy.callback_groups.MutuallyExclusiveCallbackGroup()
+
+        self.create_subscription(VehicleStatus, 'fmu/vehicle_status/out', self.cb_veh_sta, 
+                                 10, callback_group=group1)
+        self.create_subscription(VehicleControlMode, 'fmu/vehicle_control_mode/out', self.cb_veh_ctl_mod,
+                                 10, callback_group=group1)
 
         self.veh_sta = VehicleStatus()
         self.veh_ctl_mod = VehicleControlMode()
@@ -113,16 +118,19 @@ class Vision(Node):
 
         # connect & subs MQTT in new thread
         self.timer_mqtt = self.create_timer(0.01,
-                                            self.mqtt_loop)
+                                            self.mqtt_loop,
+                                            group1)
         
         self.MQTTClient.connect(mqtt_param["broker"], mqtt_param["port"])
 
         self.timer_crow = self.create_timer(self.loop_time,
-                                            self.detect_crow_routine)
+                                            self.detect_crow_routine,
+                                            group2)
         self.timer_crow.cancel()
         
         self.timer_precland = self.create_timer(self.loop_time,
-                                                self.precision_landing_routine)
+                                                self.precision_landing_routine,
+                                                group1)
         self.timer_precland.cancel()
         self.get_logger().info("Program vision initialized")
         
@@ -224,10 +232,14 @@ class Vision(Node):
 if __name__ == '__main__':
     rclpy.init(args=None)
 
+    executor = rclpy.executors.MultiThreadedExecutor(2)
+
     vision = Vision()
 
-    rclpy.spin(vision)
-
+    executor.add_node(vision)
+    
+    executor.spin()
+        
     vision.destroy_node()
 
     rclpy.shutdown()
