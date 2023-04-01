@@ -40,7 +40,7 @@ Build using script:
 /bin/bash ~/cigritous_ws/src/installation/build.sh
 ```
 
-#### Autostart install
+### Autostart install
 
 ---
 ##### OPTIONAL: Add VIO bridge to autostart 
@@ -54,12 +54,27 @@ Add this command at the last line
 `ros2 launch cigritous vio_bridge.cpp`
 
 Then save
+
 ---
 
 To make the program autostart, run these:
 
 ```bash
 /bin/bash ~/cigritous_ws/src/installation/install_autostart.sh
+```
+
+# Usage
+
+## Launching program
+
+Vision program:
+```bash
+ros2 launch cigritous vision.py
+```
+
+VIO program:
+```bash
+ros2 launch cigritous vio_bridge.py
 ```
 
 ### Full Install Procedure
