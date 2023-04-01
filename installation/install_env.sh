@@ -31,15 +31,3 @@ fi
 echo "ROS2 ${ROS_DISTRO} installed"
 
 sh px4/px4_install.sh
-
-cd ~/cigritous_ws
-
-colcon build --packages-select px4_msgs
-colcon build --packages-select px4_ros_com
-colcon build --packages-select cigritous
-
-echo "source ~/cigritous_ws/install/setup.bash" >> ~/.bashrc
-
-#sh ./install_autostart.sh
-
-echo "Installation complete! Launch using 'ros2 launch cigritous vision.py' "
