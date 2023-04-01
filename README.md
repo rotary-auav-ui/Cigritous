@@ -46,6 +46,18 @@ Software:
 #### Installation and Usage
 [Click Here](https://github.com/rotary-auav-ui/cigritous/blob/main/INSTALL.md)  
 
+#### Additional Files
+
+- AprilTag
+
+Directory: `docs/apriltags`
+
+We use 36h11 families
+
+- Crow Image (for testing purposes)
+
+Directory: `docs/crow_image`
+
 #### Detection Performance using NXP NavQ+
 !['crow detected'](https://github.com/rotary-auav-ui/cigritous/blob/main/docs/detection.jpg)  
 
