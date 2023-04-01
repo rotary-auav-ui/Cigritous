@@ -34,6 +34,7 @@ class CrowML():
     def detect(self, frame):
         # downscale image to tensor matrix
         frame = cv2.resize(frame, (self.height, self.width))
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         # add N dim
         input_data = np.expand_dims(frame, axis=0)

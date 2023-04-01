@@ -7,6 +7,7 @@ from launch.actions import ExecuteProcess, TimerAction
 
 def generate_launch_description():
 
+    # set /dev/ttymxc2 according to your usb address detected by FCU
     call_micrortps_agent = ExecuteProcess(
         cmd=['micrortps_agent', ' -d', ' /dev/ttymxc2', '-b', '921600'], 
         shell=True, 
