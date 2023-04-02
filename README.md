@@ -1,66 +1,85 @@
-# Website Cigritous
+# Cigritous Website / Webserver
 
-This website is a platform that is useful for monitoring and controlling drones in performing their tasks. This website consists of 3 pages, namely the dashboard page, about page, and control page. This website is connected to MQTT as communication for ESP and PostgreSQL for DBMS.
+This website is a platform that is useful for monitoring and controlling drones in performing their tasks. This website consists of 3 pages, namely the dashboard page, about page, and control page. This website is connected to MQTT as communication for ESP32 and PostgreSQL for DBMS.
 
-You can see the results of the finished website by clicking the following link: [Cigritous.tech](https://www.cigritous.tech/)
+You can see the results of the finished website by clicking the following link: [www.cigritous.tech](https://www.cigritous.tech/)
+
+## Installation
+
+```bash
+git clone -b web_server https://github.com/rotary-auav-ui/cigritous.git
+```
 
 ---
 
-# Installation In Local
+## Dependencies
+### Node.js
 
-In the installation section, because this web is built on Node JS. So you must install Node JS first to run this website on your local computer And if you want to run this web normally for your personal gain, you must have MQTT for communication to ESP and PostgreSQL for Database. then, appropriate in this code like enviroment variabel and etc.
+[Installation](https://nodejs.org/en/download)
 
-Install Node JS: [Node JS](https://nodejs.org/en/download)
+### PostgreSQL
 
-## For Front End
+[Installation](https://www.postgresql.org/download/)
 
-In the project directory, you can run:
+### React.js
 
-### `npm install`
+---
 
-Run this comment when node_modulous not show in your project directory.\
-If error, please install node JS.
+Then configure the environment variable, etc according to your setup
 
-### `npm start`
+## Usage
 
-Runs the app in the development mode.\
+Change directory to use `front-end` or `back-end`
+
+---
+
+**Front End**
+
+```bash
+cd cigritous/web-server/front-end-main
+```
+
+**Back End**
+
+```bash
+cd cigritous/web-server/new-back-end
+```
+
+---
+
+```bash
+npm install
+npm start
+```
+
+`npm start` will run the app in the development mode.
+
 Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 
-The page will reload when you make changes.\
+**The page will reload when you make changes.**
+
 You may also see any lint errors in the console.
 
-### `npm test`
+*Back End: `http://localhost:5000/updatecentral` to get central Node data.*
 
-Launches the test runner in the interactive watch mode.\
+You can add API for doing get or post data from database.
+Example : `http://localhost:5000/updatecentral` for get data central Node.
 
-### `npm run build`
+```bash
+npm test
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Launches the test runner in the interactive watch mode
 
-The build is minified and the filenames include the hashes.\
+```bash
+npm run build
+```
+
+Builds the app for production to the `build` folder
+It correctly bundles React in production mode and optimizes the build for the best performance
+
+The build is minified and the filenames include the hashes
 Your app is ready to be deployed!
-
-## For Back End
-
-In the project directory, you can run:
-
-### `npm install`
-
-Run this comment when node_modulous not show in your project directory.\
-If error, please install node JS.
-
-### `npm start`
-
-Runs the app in the development mode.\
-Open [http://localhost:5000](http://localhost:5000) to view it in your browser.
-
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
-And you can Add api for doing get or post data from database.
-example : `http://localhost:5000/updatecentral` for get data central Node.
-
----
 
 ## Dashboard Page
 
@@ -74,7 +93,7 @@ Useful for determining many nodes, monitoring the position of the drone in real 
 
 ![Gambar Dashboard](https://cdn.discordapp.com/attachments/1048974551440179331/1091349327412203560/image.png)
 
-## ![Gambar Dashboard](https://cdn.discordapp.com/attachments/1048974551440179331/1091355107066646649/image.png)
+![Gambar Dashboard](https://cdn.discordapp.com/attachments/1048974551440179331/1091355107066646649/image.png)
 
 ---
 
