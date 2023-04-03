@@ -326,7 +326,7 @@ const Home = () => {
             coordinate: data.map((item) => item.coordinate),
           });
 
-          setMapsFlight((prevArr) => [...prevArr, data.map((item) => JSON.parse(item.coordinate))]);
+          setMapsFlight((prevArr) => [...prevArr, data.map((item) => item.coordinate)]);
           setMapsFlightLtd((prevArr) => [...prevArr, data.map((item) => item.latitude)]);
           setMapsFlightLng((prevArr) => [...prevArr, data.map((item) => item.longitude)]);
 
