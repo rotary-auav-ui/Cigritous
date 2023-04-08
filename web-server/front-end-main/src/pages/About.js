@@ -5,7 +5,7 @@ import logo from "../logo_0.png";
 import moment from "moment/moment";
 import { Canvas, useFrame, useThree } from "react-three-fiber";
 import { Physics, usePlane, useBox } from "@react-three/cannon";
-import Button from "@mui/material/Button";
+import CustomButton from "./components/CustomButton";
 import "bootstrap/dist/css/bootstrap.min.css";
 import image1 from "../DRONE2.jpeg";
 import image2 from "../DRONE4.jpg";
@@ -43,39 +43,9 @@ const About = () => {
         <Typography>{daysTime}</Typography>
         <Stack direction={"column"} padding="20px" gap="20px"></Stack>
         <Stack direction="column" spacing={1}>
-          <Button
-            onMouseEnter={handleDashboardHover}
-            onMouseLeave={handleDashboardHover}
-            style={{
-              color: hoverDashboard ? "#6841b0" : "white",
-              fontSize: 20,
-            }}
-            href="/"
-          >
-            Dashboard
-          </Button>
-          <Button
-            onMouseEnter={handleAboutHover}
-            onMouseLeave={handleAboutHover}
-            style={{
-              color: hoverAbout ? "#6841b0" : "white",
-              fontSize: 20,
-            }}
-            href="/About"
-          >
-            About
-          </Button>
-          <Button
-            onMouseEnter={handleControlsHover}
-            onMouseLeave={handleControlsHover}
-            style={{
-              color: hoverControls ? "#6841b0" : "white",
-              fontSize: 20,
-            }}
-            href="/Controls"
-          >
-            Controls
-          </Button>
+          <CustomButton href="/" label="Dashboard" hover={hoverDashboard} handleHover={handleDashboardHover} />
+          <CustomButton href="/About" label="About" hover={hoverAbout} handleHover={handleAboutHover} />
+          <CustomButton href="/Controls" label="Controls" hover={hoverControls} handleHover={handleControlsHover} />
         </Stack>
         <Stack direction={"column"} padding="20px" gap="0px"></Stack>
 

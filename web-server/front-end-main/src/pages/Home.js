@@ -8,7 +8,6 @@ import axios from "axios";
 import GoogleMapReact from "google-map-react";
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from "chart.js";
 import { MDBContainer } from "mdbreact";
-import Button from "@mui/material/Button";
 import "bootstrap/dist/css/bootstrap.min.css";
 import mqtt from "mqtt/dist/mqtt";
 import CorCard from "./components/CoordinateCard";
@@ -18,7 +17,7 @@ import LineChartCentral from "./components/LineChartCentral";
 import LineChartNode from "./components/LineChartNode";
 import LocationPin from "./components/LocationPin";
 import LocationDrone from "./components/LocationDrone";
-import { FaPlane } from "react-icons/fa";
+import CustomButton from "./components/CustomButton";
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
@@ -42,10 +41,6 @@ const Home = () => {
   const [droneFlightLng, setDroneFlightLng] = useState([]);
   const [mapsFlightLtd, setMapsFlightLtd] = useState([]);
   const [mapsFlightLng, setMapsFlightLng] = useState([]);
-  const [data, setData] = useState([]);
-  const [labels, setLabels] = useState([]);
-  const [datasets, setDatasets] = useState([]);
-  const [start, setStart] = useState(0);
 
   let totalNode = 20;
 
@@ -400,101 +395,6 @@ const Home = () => {
     sendData();
   }, [arrTemp, arrHumid, arrMoist, shouldSkip, mapsFlight, mapsFlightLng, mapsFlightLtd]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const response = await axios.get("https://vtol-cigritous-backend.herokuapp.com/api/drone");
-      setData(response.data);
-      let lastElement = response.data.slice(-1)[0];
-      // setAttitude({
-      //   yaw: lastElement.yaw,
-      //   roll: lastElement.roll,
-      //   pitch: lastElement.pitch,
-      //   att: lastElement.alt,
-      //   lat: lastElement.lat,
-      //   lng: lastElement.lng,
-      // });
-      if (data.length < 13) setStart(0);
-      else setStart(data.length - 11);
-      setLabels(
-        data.slice(start, data.length).map((item) => {
-          return moment(item.insertedAt).format("DD-MM-YYYY, h:mm:ss a");
-        })
-      );
-      setDatasets([
-        {
-          label: "Yaw",
-          fill: true,
-          lineTension: 0.3,
-          backgroundColor: "rgba(225, 204,230, .3)",
-          borderColor: "rgb(205, 130, 158)",
-          borderCapStyle: "butt",
-          borderDash: [],
-          borderDashOffset: 0.0,
-          borderJoinStyle: "miter",
-          pointBorderColor: "rgb(205, 130,1 58)",
-          pointBackgroundColor: "rgb(255, 255, 255)",
-          pointBorderWidth: 0,
-          pointHoverRadius: 5,
-          pointHoverBackgroundColor: "rgb(0, 0, 0)",
-          pointHoverBorderColor: "rgba(220, 220, 220,1)",
-          pointHoverBorderWidth: 2,
-          pointRadius: 1,
-          pointHitRadius: 10,
-          data: data.slice(start, data.length).map((item) => {
-            return item.yaw;
-          }),
-        },
-        {
-          label: "Pitch",
-          fill: true,
-          lineTension: 0.3,
-          backgroundColor: "rgba(184, 185, 210, .3)",
-          borderColor: "rgb(35, 26, 136)",
-          borderCapStyle: "butt",
-          borderDash: [],
-          borderDashOffset: 0.0,
-          borderJoinStyle: "miter",
-          pointBorderColor: "rgb(35, 26, 136)",
-          pointBackgroundColor: "rgb(255, 255, 255)",
-          pointBorderWidth: 0,
-          pointHoverRadius: 5,
-          pointHoverBackgroundColor: "rgb(0, 0, 0)",
-          pointHoverBorderColor: "rgba(220, 220, 220, 1)",
-          pointHoverBorderWidth: 2,
-          pointRadius: 1,
-          pointHitRadius: 10,
-          data: data.slice(start, data.length).map((item) => {
-            return item.pitch;
-          }),
-        },
-        {
-          label: "Roll",
-          fill: true,
-          lineTension: 0.3,
-          backgroundColor: "rgba(188, 210, 184, .3)",
-          borderColor: "rgb(44, 136, 26)",
-          borderCapStyle: "butt",
-          borderDash: [],
-          borderDashOffset: 0.0,
-          borderJoinStyle: "miter",
-          pointBorderColor: "rgb(44, 136, 26)",
-          pointBackgroundColor: "rgb(255, 255, 255)",
-          pointBorderWidth: 0,
-          pointHoverRadius: 5,
-          pointHoverBackgroundColor: "rgb(0, 0, 0)",
-          pointHoverBorderColor: "rgba(220, 220, 220, 1)",
-          pointHoverBorderWidth: 2,
-          pointRadius: 1,
-          pointHitRadius: 10,
-          data: data.slice(start, data.length).map((item) => {
-            return item.roll;
-          }),
-        },
-      ]);
-    };
-    fetchData();
-  }, [data, start]);
-
   return (
     <Stack direction={"row"} gap={"30px"}>
       <Stack flexBasis={"25%"} width={"80%"} maxWidth={"25%"} alignItems="center" gap="10px" sx={{ background: "#000000", height: "100vh", padding: "30px" }}>
@@ -504,39 +404,9 @@ const Home = () => {
         <Typography>{daysTime}</Typography>
         <Stack direction={"column"} padding="20px" gap="20px"></Stack>
         <Stack direction="column" spacing={1}>
-          <Button
-            onMouseEnter={handleDashboardHover}
-            onMouseLeave={handleDashboardHover}
-            style={{
-              color: hoverDashboard ? "#6841b0" : "white",
-              fontSize: 20,
-            }}
-            href="/"
-          >
-            Dashboard
-          </Button>
-          <Button
-            onMouseEnter={handleAboutHover}
-            onMouseLeave={handleAboutHover}
-            style={{
-              color: hoverAbout ? "#6841b0" : "white",
-              fontSize: 20,
-            }}
-            href="/About"
-          >
-            About
-          </Button>
-          <Button
-            onMouseEnter={handleControlsHover}
-            onMouseLeave={handleControlsHover}
-            style={{
-              color: hoverControls ? "#6841b0" : "white",
-              fontSize: 20,
-            }}
-            href="/Controls"
-          >
-            Controls
-          </Button>
+          <CustomButton href="/" label="Dashboard" hover={hoverDashboard} handleHover={handleDashboardHover} />
+          <CustomButton href="/About" label="About" hover={hoverAbout} handleHover={handleAboutHover} />
+          <CustomButton href="/Controls" label="Controls" hover={hoverControls} handleHover={handleControlsHover} />
         </Stack>
         <Stack direction={"column"} padding="20px" gap="0px"></Stack>
         <Canvas dpr={[1, 2]} shadows camera={{ position: [-5, 5, 5], fov: 18 }}>
@@ -585,17 +455,6 @@ const Home = () => {
                   setMapsFlight(arr);
                   setMapsFlightLtd(arr1);
                   setMapsFlightLng(arr2);
-
-                  // fetch("/api/save-location", {
-                  //   method: "POST",
-                  //   body: JSON.stringify({ lat: e.lat, lng: e.lng }),
-                  //   headers: {
-                  //     "Content-Type": "application/json",
-                  //   },
-                  // })
-                  //   .then((response) => response.json())
-                  //   .then((data) => console.log("Location saved:", data))
-                  //   .catch((error) => console.error("Error:", error));
                 }
               }}
             >
