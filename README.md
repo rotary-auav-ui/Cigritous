@@ -22,7 +22,7 @@ For detailed concept, please read: [Crop Monitoring with Automated UAV Spray Res
 - Adrian Leo P. (Electrical Engineering 25)
 - M. Daffa Aryasetya (Electrical Engineering 25)
 - M. Fikri R. Abyadhi (Electrical Engineering 25)
-- Rizki Awanta Jordhie (Computer Engineering 25)
+- Rizky Awanta Jordhie (Computer Engineering 25)
 
 ## Branch Information
 
