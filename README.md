@@ -53,13 +53,13 @@ Software:
 
 Directory: `docs/apriltags`
 
-We use 36h11 families
+We use AprilTag with 36h11 family
 
 - Crow Image (for testing purposes)
 
 Directory: `docs/crow_image`
 
-#### Detection Performance using NXP NavQ+
+#### Detection Performance using NXP NavQ+ Single Board COmputer
 !['crow detected'](https://github.com/rotary-auav-ui/cigritous/blob/main/docs/detection.jpg)  
 
 Model: Quantized INT8 YOLOv5
@@ -100,7 +100,7 @@ Software:
 
 *`web_server`*
 
-Branch for webserver front end. Acts as Web-based Ground Control Station which display agriculture and drone data from sensor network. **The system is backend-less because direct sensor network communication using MQTT**. *Tested in Heroku*.
+Branch for webserver front end. Acts as Web-based Ground Control Station which display agriculture and drone data from sensor network. *Tested in Heroku*.
 
 #### Installation and Usage
 [Read Me!](https://github.com/rotary-auav-ui/cigritous/blob/web_server/README.md)  
