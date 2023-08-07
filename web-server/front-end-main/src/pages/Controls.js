@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Stack, Typography, Grid, Card, Box } from "@mui/material";
-import logo from "../logo_0.png";
+import { Stack, Typography, Grid, Card, Box} from "@mui/material";
+import CardCover from '@mui/joy/CardCover';
+import CardContent from '@mui/joy/CardContent';
+import logo from "../public/logo_1.png";
 import moment from "moment/moment";
 import axios from "axios";
 import { Canvas } from "react-three-fiber";
-import { Physics, usePlane } from "@react-three/cannon";
-import GoogleMapReact from "google-map-react";
+import { Physics} from "@react-three/cannon";
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from "chart.js";
 import CustomButton from "./components/CustomButton";
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -15,53 +16,21 @@ import Cube from "./components/Cube";
 import LocationPin from "./components/LocationPin";
 import SensorCard from "./components/SensorCard";
 import LocationDrone from "./components/LocationDrone";
+import GoogleMaps from "./utility/GoogleMaps";
+import options from "./utility/OptionsMQTT";
+import {handleTakeOff,handleLanding} from "./utility/FlightHandling"
 
-var options = {
-  port: 38789,
-  host: "wss://driver.cloudmqtt.com",
-  clientId: "mqttjs_" + Math.random().toString(16).substr(2, 8),
-  username: "cbobzrgp",
-  password: "CKvOQLxrtuqc",
-};
+
+
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
-const handleTakeOff = () => {
-  let hasPublished = false;
-  const client = mqtt.connect("wss://driver.cloudmqtt.com:1884", options);
-  client.on(
-    "connect",
-    () => {
-      console.log("MQTT client connected to the server.");
-      if (!hasPublished) {
-        client.publish("/drone/take_land", String(1), { qos: 0 });
-        hasPublished = true;
-      }
-      return () => client.end();
-    },
-    []
-  );
-};
 
-const handleLanding = () => {
-  let hasPublished = false;
-  const client = mqtt.connect("wss://driver.cloudmqtt.com:1884", options);
-  client.on(
-    "connect",
-    () => {
-      console.log("MQTT client connected to the server.");
-      if (!hasPublished) {
-        client.publish("/drone/take_land", String(0), { qos: 0 });
-        hasPublished = true;
-      }
-      return () => client.end();
-    },
-    []
-  );
-};
+
 
 const Controls = () => {
   moment.locale("id");
+
   const [hoursTime, setHoursTime] = useState("");
   const [daysTime, setDaysTime] = useState("");
   const [mapsFlight, setMapsFlight] = useState([]);
@@ -69,15 +38,10 @@ const Controls = () => {
   const [droneFlightLng, setDroneFlightLng] = useState([]);
   const [mapsFlightLtd, setMapsFlightLtd] = useState([]);
   const [mapsFlightLng, setMapsFlightLng] = useState([]);
-  const [droneStatus, setDroneStatus] = useState([]);
-  const [droneBattery, setDroneBattery] = useState([]);
-  const [droneAltitude, setDroneAltitude] = useState([]);
-  const [droneSpeedX, setDroneSpeedX] = useState([]);
-  const [droneSpeedY, setDroneSpeedY] = useState([]);
-  const [droneSpeedZ, setDroneSpeedZ] = useState([]);
   const [droneProgress, setDroneProgress] = useState([]);
-  const [droneHeading, setDroneHeading] = useState([]);
-  const [droneTimestamp, setDroneTimeStamp] = useState([]);
+  const [droneStatus, setDroneStatus] = useState([]);
+  const [droneAltitude, setDroneAltitude] = useState([]);
+
 
   let arrCoor = [...mapsFlight];
 
@@ -214,19 +178,15 @@ const Controls = () => {
   }, []);
 
   useEffect(() => {
-    const client = mqtt.connect("wss://driver.cloudmqtt.com:1884", options);
+    const port = 1884;
+    const client = mqtt.connect(`wss://driver.cloudmqtt.com:${port}`, options);
     client.on("connect", () => {
       console.log("MQTT client connected to the server.");
       client.subscribe("/drone/status");
-      client.subscribe("/drone/battery");
       client.subscribe("/drone/progress");
       client.subscribe("/drone/lat");
       client.subscribe("/drone/lng");
       client.subscribe("/drone/alt");
-      client.subscribe("/drone/vx");
-      client.subscribe("/drone/vy");
-      client.subscribe("/drone/vz");
-      client.subscribe("/drone/yaw_curr");
       client.subscribe("/drone/time");
       for (let i = 1; i <= 20; i++) {
         client.subscribe("/" + i + "/coordinate");
@@ -243,9 +203,6 @@ const Controls = () => {
           setDroneStatus("Armed");
         }
       }
-      if (topic === "/drone/battery") {
-        setDroneBattery(message.toString());
-      }
       if (topic === "/drone/progress") {
         setDroneProgress(message.toString());
       }
@@ -257,21 +214,6 @@ const Controls = () => {
       }
       if (topic === "/drone/alt") {
         setDroneAltitude(message.toString());
-      }
-      if (topic === "/drone/vx") {
-        setDroneSpeedX(message.toString());
-      }
-      if (topic === "/drone/vy") {
-        setDroneSpeedY(message.toString());
-      }
-      if (topic === "/drone/vz") {
-        setDroneSpeedZ(message.toString());
-      }
-      if (topic === "/drone/yaw_curr") {
-        setDroneHeading(message.toString());
-      }
-      if (topic === "/drone/time") {
-        setDroneTimeStamp(message.toString());
       }
       for (let i = 1; i <= 20; i++) {
         if (topic === "/" + i + "/coordinate") {
@@ -331,84 +273,72 @@ const Controls = () => {
             Switch to {mapType === "roadmap" ? "Satellite" : "Roadmap"} view
           </button>
         </Stack>
-        <Stack direction={"column"} padding="20px" gap="20px">
-          <Stack style={{ height: "50vh", width: "100%" }}>
-            <GoogleMapReact
-              bootstrapURLKeys={{
-                key: "AIzaSyD3RzE2fq7JvhFmDTbXyjj22jqIAytT7XU",
-                language: "id",
-              }}
-              defaultCenter={defaultProps.center}
-              defaultZoom={defaultProps.zoom}
-              options={{ mapTypeId: mapType }}
-            >
-              <LocationDrone lat={droneFlightLtd} lng={droneFlightLng} text="Drone" color="white" startLat={droneFlightLtd} startLong={droneFlightLng} />
-              {mapsFlightLtd?.map((lat, idx) => (
-                <LocationPin lat={lat} lng={mapsFlightLng[idx]} text={`Node ke-${idx + 1}`} color="yellow" />
-              ))}
-            </GoogleMapReact>
+          <Stack direction={"column"} padding="20px" gap="20px">
+            
+
+            <GoogleMaps />
+            
+
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <button
+                onMouseEnter={() => handleCardHover(6)}
+                onMouseLeave={() => handleCardHover(6)}
+                style={{ backgroundColor: "#3D3356", color: "white", padding: "10px 30px", border: "none", boxShadow: hoverCard[6] ? "0px 0px 20px 0px #000000" : "none" }}
+                onClick={handleTakeOff}
+              >
+                Take Off Drone
+              </button>
+              <Card
+                onMouseEnter={() => handleCardHover(8)}
+                onMouseLeave={() => handleCardHover(8)}
+                style={{ backgroundColor: "#3D3356", color: "white", padding: "10px 30px", border: "none", boxShadow: hoverCard[8] ? "0px 0px 20px 0px #000000" : "none" }}
+              >
+                Task Progress : {droneProgress}%{" "}
+              </Card>
+              <button
+                onMouseEnter={() => handleCardHover(7)}
+                onMouseLeave={() => handleCardHover(7)}
+                style={{ backgroundColor: "#3D3356", color: "white", padding: "10px 30px", border: "none", boxShadow: hoverCard[7] ? "0px 0px 20px 0px #000000" : "none" }}
+                onClick={handleLanding}
+              >
+                Landing Drone
+              </button>
+            </div>
+            
+        
+      
           </Stack>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <button
-              onMouseEnter={() => handleCardHover(6)}
-              onMouseLeave={() => handleCardHover(6)}
-              style={{ backgroundColor: "#3D3356", color: "white", padding: "10px 30px", border: "none", boxShadow: hoverCard[6] ? "0px 0px 20px 0px #000000" : "none" }}
-              onClick={handleTakeOff}
-            >
-              Take Off Drone
-            </button>
-            <Card
-              onMouseEnter={() => handleCardHover(8)}
-              onMouseLeave={() => handleCardHover(8)}
-              style={{ backgroundColor: "#3D3356", color: "white", padding: "10px 30px", border: "none", boxShadow: hoverCard[8] ? "0px 0px 20px 0px #000000" : "none" }}
-            >
-              Task Progress : {droneProgress}%{" "}
-            </Card>
-            <button
-              onMouseEnter={() => handleCardHover(7)}
-              onMouseLeave={() => handleCardHover(7)}
-              style={{ backgroundColor: "#3D3356", color: "white", padding: "10px 30px", border: "none", boxShadow: hoverCard[7] ? "0px 0px 20px 0px #000000" : "none" }}
-              onClick={handleLanding}
-            >
-              Landing Drone
-            </button>
-          </div>
-          <Stack direction={"column"} padding="10px" gap="10px"></Stack>
+        
+        <Stack direction={"column"} padding="10px" gap="5px" height="50vh">
+          <Card>
+          <video
+            autoPlay
+            loop
+            muted
+            poster="https://assets.codepen.io/6093409/river.jpg"
+          >
+            <source
+              src="https://assets.codepen.io/6093409/river.mp4"
+              type="video/mp4"
+            />
+          </video>
+          
+
+          </Card>
+          
+          
         </Stack>
+
         <Stack direction={"column"} padding="20px" gap="10px">
+           
+      
           <CorCard title="Coordinate Position Drone" value={"Lat : " + droneFlightLtd + " || Lng : " + droneFlightLng} handleCardHover={() => handleCardHover(3)} hoverCard={hoverCard[3]} />
-          <Stack direction={"column"} padding="20px" gap="10px">
-            <Grid container spacing={2} columns={3} width="100%" justifyContent={"center"}>
-              <Grid item xs={1}>
-                <SensorCard title="Status Drone" value={droneStatus} handleCardHover={() => handleCardHover(1)} hoverCard={hoverCard[1]} />
-              </Grid>
-              <Grid item xs={1}>
-                <SensorCard title="Timestamp Drone" value={droneTimestamp} handleCardHover={() => handleCardHover(9)} hoverCard={hoverCard[9]} />
-              </Grid>
-              <Grid item xs={1}>
-                <SensorCard title="Status Battery" value={droneBattery + " %"} handleCardHover={() => handleCardHover(2)} hoverCard={hoverCard[2]} />
-              </Grid>
-              <Grid item xs={1}>
+          <Grid item xs={1}>
                 <SensorCard title="Altitude Drone" value={droneAltitude} handleCardHover={() => handleCardHover(3)} hoverCard={hoverCard[3]} />
-              </Grid>
-              <Grid item xs={1}>
-                <SensorCard title="Heading Drone" value={droneHeading} handleCardHover={() => handleCardHover(10)} hoverCard={hoverCard[10]} />
-              </Grid>
-            </Grid>
-            <Stack direction={"column"} padding="20px" gap="10px">
-              <Grid container spacing={2} columns={3} width="100%" justifyContent={"center"}>
-                <Grid item xs={1}>
-                  <SensorCard title="Speed Drone (X)" value={droneSpeedX} handleCardHover={() => handleCardHover(4)} hoverCard={hoverCard[4]} />
-                </Grid>
-                <Grid item xs={1}>
-                  <SensorCard title="Speed Drone (Y)" value={droneSpeedY} handleCardHover={() => handleCardHover(10)} hoverCard={hoverCard[10]} />
-                </Grid>
-                <Grid item xs={1}>
-                  <SensorCard title="Speed Drone (Z)" value={droneSpeedZ} handleCardHover={() => handleCardHover(11)} hoverCard={hoverCard[11]} />
-                </Grid>
-              </Grid>
-            </Stack>
-          </Stack>
+          </Grid>
+        
+          
+          
         </Stack>
       </Box>
     </Stack>

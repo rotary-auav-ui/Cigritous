@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from "react";
 import ParagraphView from "./components/ParagraphView";
 import { Stack, Typography, Grid, Card, CardHeader, CardContent, IconButton, Box, Input } from "@mui/material";
-import logo from "../logo_0.png";
+import logo from "../public/logo_1.png";
 import moment from "moment/moment";
 import { Canvas, useFrame, useThree } from "react-three-fiber";
 import { Physics, usePlane, useBox } from "@react-three/cannon";
 import CustomButton from "./components/CustomButton";
 import "bootstrap/dist/css/bootstrap.min.css";
-import image1 from "../DRONE2.jpeg";
-import image2 from "../DRONE4.jpg";
-import image3 from "../DRONE5.jpg";
+import image1 from "../public/DRONE2.jpeg";
+import image2 from "../public/DRONE4.jpg";
+import image3 from "../public/DRONE5.jpg";
 import Cube from "./components/Cube";
 
 const About = () => {
@@ -68,7 +68,7 @@ const About = () => {
           }}
           textAlign="center"
         >
-          About Cigritous
+          About VishGround
         </Typography>
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "50vh" }}>
           <Stack direction={"row"} gap={"20px"}>
@@ -79,10 +79,9 @@ const About = () => {
         </div>
         <div>
           <ParagraphView
-            text="Our goal is to create a system called 'Crop Monitoring with Automated UAV Spray Response,' which utilizes technology to safeguard crop quality against weather factors and pests. This system has the potential to enhance the economy of developing countries by assisting farmers in minimizing costs. Precise farming techniques can be facilitated with GPS technologies, which enable data collection, field mapping, farm planning, and yield management. Moreover, GPS technologies can be used to provide automated directions to UAVs.
-            This Project comprehensive monitoring and spraying system that involves monitoring various parameters in each crop, such as moisture, humidity, and temperature. These parameters will be transmitted to a central module, which includes a Bosch Sensortec BME688 gas sensor, global position data from each sensor, and an internet connection for remote or cloud-based monitoring.
-            
-            If any crops are identified as underwatered or at risk due to gas presence, ozone, temperature, moisture, or humidity levels, the central module will trigger the HoverGames Drone UAV to take off and spray the designated location with water or pesticide. The UAV is equipped with an i.MX 8M companion computer for pest tracking and precision landing, as well as a Telemetry Radio for relaying the UAV's condition to the central module and the user. Once the spraying task is completed, the UAV will autonomously return to its base."
+            text="VishGround is a system used to control and monitor unmanned aerial vehicles 
+            (UAVs) or other aircraft remotely from the ground. It serves as a command center that enables 
+            human operators to control aircraft operations in real-time. Vishwakharma Team is a team from the University of Indonesia specializing in VTOL (Vertical Take-Off and Landing) technology. They are dedicated to advancing and innovating in the field of aerial vehicles. The team consists of passionate and motivated individuals who strive to push the boundaries of aviation engineering.They actively participate in various competitions and projects, showcasing their expertise and technical skills.Their commitment to excellence and continuous learning makes them a valuable asset in the field of aviation technology."
           />
         </div>
       </Box>
